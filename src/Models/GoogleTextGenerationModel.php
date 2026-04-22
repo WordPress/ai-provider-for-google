@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace WordPress\GoogleAiProvider\Models;
 
+use ReflectionClass;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
 use WordPress\AiClient\Common\Exception\RuntimeException;
+use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\Message;
 use WordPress\AiClient\Messages\DTO\MessagePart;
@@ -576,13 +578,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $id = isset($responseData['id']) && is_string($responseData['id']) ? $responseData['id'] : '';
 
         if (isset($responseData['usageMetadata']) && is_array($responseData['usageMetadata'])) {
-            $usage = $responseData['usageMetadata'];
-
-            $tokenUsage = new TokenUsage(
-                $usage['promptTokenCount'] ?? 0,
-                $usage['candidatesTokenCount'] ?? 0,
-                ($usage['candidatesTokenCount'] ?? 0) + ($usage['thoughtsTokenCount'] ?? 0)
-            );
+            $tokenUsage = $this->parseResponseUsageToTokenUsage($responseData['usageMetadata']);
         } else {
             $tokenUsage = new TokenUsage(0, 0, 0);
         }
@@ -730,7 +726,13 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 throw new InvalidArgumentException('Part has an invalid text shape.');
             }
             if (isset($partData['thought']) && $partData['thought']) {
-                return new MessagePart($partData['text'], MessagePartChannelEnum::thought());
+                if (isset($partData['thoughtSignature']) && !is_string($partData['thoughtSignature'])) {
+                    throw new InvalidArgumentException('Part has an invalid thoughtSignature shape.');
+                }
+                return $this->createThoughtMessagePart(
+                    $partData['text'],
+                    $partData['thoughtSignature'] ?? null
+                );
             }
             return new MessagePart($partData['text']);
         }
@@ -793,5 +795,72 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             );
         }
         throw new InvalidArgumentException('Part has an unexpected type.');
+    }
+
+    /**
+     * Parses usage metadata from the API response into a TokenUsage object.
+     *
+     * @since 1.0.0
+     *
+     * @param UsageData $usageMetadata The usage metadata from the API response.
+     * @return TokenUsage The parsed token usage.
+     */
+    protected function parseResponseUsageToTokenUsage(array $usageMetadata): TokenUsage
+    {
+        $promptTokenCount = $usageMetadata['promptTokenCount'] ?? 0;
+        $candidatesTokenCount = $usageMetadata['candidatesTokenCount'] ?? 0;
+        $thoughtsTokenCount = $usageMetadata['thoughtsTokenCount'] ?? 0;
+        $totalOutputTokenCount = $candidatesTokenCount + $thoughtsTokenCount;
+
+        /*
+         * Thought token count support was added in wordpress/php-ai-client 1.5.0.
+         * For older versions, continue using the 3-argument constructor.
+         */
+        if (version_compare(AiClient::VERSION, '1.5.0', '>=')) {
+            $tokenUsageReflection = new ReflectionClass(TokenUsage::class);
+            $constructor = $tokenUsageReflection->getConstructor();
+            if ($constructor !== null && $constructor->getNumberOfParameters() >= 4) {
+                /** @var TokenUsage $tokenUsage */
+                $tokenUsage = $tokenUsageReflection->newInstanceArgs(
+                    [$promptTokenCount, $candidatesTokenCount, $totalOutputTokenCount, $thoughtsTokenCount]
+                );
+                return $tokenUsage;
+            }
+        }
+
+        return new TokenUsage(
+            $promptTokenCount,
+            $candidatesTokenCount,
+            $totalOutputTokenCount
+        );
+    }
+
+    /**
+     * Creates a thought message part, optionally including a thought signature.
+     *
+     * @since 1.0.0
+     *
+     * @param string $text The thought text.
+     * @param ?string $thoughtSignature The thought signature, if available.
+     * @return MessagePart The thought message part.
+     */
+    protected function createThoughtMessagePart(string $text, ?string $thoughtSignature): MessagePart
+    {
+        /*
+         * Thought signature support was added in wordpress/php-ai-client 1.5.0.
+         * For older versions, continue using the 2-argument constructor.
+         */
+        if (version_compare(AiClient::VERSION, '1.5.0', '>=') && is_string($thoughtSignature)) {
+            $messagePartReflection = new ReflectionClass(MessagePart::class);
+            $constructor = $messagePartReflection->getConstructor();
+            if ($constructor !== null && $constructor->getNumberOfParameters() >= 3) {
+                /** @var MessagePart $messagePart */
+                $messagePart = $messagePartReflection->newInstanceArgs(
+                    [$text, MessagePartChannelEnum::thought(), $thoughtSignature]
+                );
+                return $messagePart;
+            }
+        }
+        return new MessagePart($text, MessagePartChannelEnum::thought());
     }
 }
