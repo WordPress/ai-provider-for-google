@@ -24,7 +24,7 @@ use WordPress\AiClient\Results\DTO\GenerativeAiResult;
  * delegate to the language-model endpoint — the framework sets the image output modality on the config
  * before calling generateImageResult().
  *
- * @since n.e.x.t
+ * @since 1.1.0
  */
 class GoogleTextAndImageGenerationModel implements
     ApiBasedModelInterface,
@@ -41,7 +41,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * Constructor.
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      *
      * @param ModelMetadata    $metadata         The metadata for the model.
      * @param ProviderMetadata $providerMetadata The metadata for the model's provider.
@@ -53,7 +53,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function metadata(): ModelMetadata
     {
@@ -63,7 +63,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function providerMetadata(): ProviderMetadata
     {
@@ -73,7 +73,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function setConfig(ModelConfig $config): void
     {
@@ -83,7 +83,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function getConfig(): ModelConfig
     {
@@ -93,7 +93,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function setRequestOptions(RequestOptions $requestOptions): void
     {
@@ -103,7 +103,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function getRequestOptions(): ?RequestOptions
     {
@@ -113,7 +113,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function setHttpTransporter(HttpTransporterInterface $httpTransporter): void
     {
@@ -123,7 +123,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function getHttpTransporter(): HttpTransporterInterface
     {
@@ -133,7 +133,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function setRequestAuthentication(RequestAuthenticationInterface $requestAuthentication): void
     {
@@ -143,7 +143,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function getRequestAuthentication(): RequestAuthenticationInterface
     {
@@ -153,7 +153,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function generateTextResult(array $prompt): GenerativeAiResult
     {
@@ -163,7 +163,7 @@ class GoogleTextAndImageGenerationModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      */
     public function generateImageResult(array $prompt): GenerativeAiResult
     {
