@@ -48,6 +48,13 @@ No, this plugin requires the PHP AI Client plugin to be installed and activated.
 
 == Changelog ==
 
+= 1.1.0 =
+
+* Add support for aspect ratios with Gemini (multimodal) image generation ([#13](https://github.com/WordPress/ai-provider-for-google/pull/13)).
+* Add a provider logo to the metadata if the ai client version > 1.3.0 ([#20](https://github.com/WordPress/ai-provider-for-google/pull/20)).
+* Fix text and image multimodal support so that it properly works regardless of capability chosen ([#14](https://github.com/WordPress/ai-provider-for-google/pull/14)).
+* Remove `additionalProperties` from the JSON response schema ([#18](https://github.com/WordPress/ai-provider-for-google/pull/18)).
+
 = 1.0.3 =
 
 * Fix critical bug that prevent use of Gemini image models because of lacking file type support annotation.
