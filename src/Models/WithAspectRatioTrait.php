@@ -9,14 +9,14 @@ use WordPress\AiClient\Files\Enums\MediaOrientationEnum;
 /**
  * Trait for handling aspect ratio preparation.
  *
- * @since n.e.x.t
+ * @since 1.1.0
  */
 trait WithAspectRatioTrait
 {
     /**
      * Prepares the aspect ratio parameter for the API request.
      *
-     * @since n.e.x.t
+     * @since 1.1.0
      *
      * @param MediaOrientationEnum|null $orientation The desired media orientation.
      * @param string|null $aspectRatio The desired media aspect ratio.

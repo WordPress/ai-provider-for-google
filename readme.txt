@@ -3,7 +3,7 @@ Contributors: wordpressdotorg
 Tags: ai, google, gemini, artificial-intelligence, connector
 Requires at least: 6.9
 Tested up to: 7.0
-Stable tag: 1.0.3
+Stable tag: 1.1.0
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -47,6 +47,13 @@ Visit the [Google AI Studio](https://aistudio.google.com/) to create an API key 
 No, this plugin requires the PHP AI Client plugin to be installed and activated. It provides the Google-specific implementation that the PHP AI Client uses.
 
 == Changelog ==
+
+= 1.1.0 =
+
+* Add support for aspect ratios with Gemini (multimodal) image generation ([#13](https://github.com/WordPress/ai-provider-for-google/pull/13)).
+* Add a provider logo to the metadata if the ai client version > 1.3.0 ([#20](https://github.com/WordPress/ai-provider-for-google/pull/20)).
+* Fix text and image multimodal support so that it properly works regardless of capability chosen ([#14](https://github.com/WordPress/ai-provider-for-google/pull/14)).
+* Remove `additionalProperties` from the JSON response schema ([#18](https://github.com/WordPress/ai-provider-for-google/pull/18)).
 
 = 1.0.3 =
 

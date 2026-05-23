@@ -88,7 +88,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
                     'Gemini image models should be used via %s going forward.',
                     GoogleTextAndImageGenerationModel::class
                 ),
-                'n.e.x.t'
+                '1.1.0'
             );
             $multimodalOutputModel = new GoogleTextGenerationModel($this->metadata(), $this->providerMetadata());
             $multimodalOutputModel->setConfig($this->getConfig());
