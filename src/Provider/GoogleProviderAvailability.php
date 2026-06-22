@@ -48,7 +48,9 @@ class GoogleProviderAvailability implements ProviderAvailabilityInterface
             $this->modelMetadataDirectory->listModelMetadata();
             return true;
         } catch (Exception $e) {
-            // If an exception occurs, the provider is not available.
+            // Intentionally catch all exceptions: any failure (network error, auth error, etc.)
+            // means the provider is not available. This mirrors the behavior of
+            // ListModelsApiBasedProviderAvailability in the php-ai-client library.
             return false;
         }
     }
