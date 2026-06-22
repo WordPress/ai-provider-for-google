@@ -109,7 +109,14 @@ class GoogleProvider extends AbstractApiProvider
     protected static function createProviderAvailability(): ProviderAvailabilityInterface
     {
         // Check valid API access by attempting to list models.
-        return new ListModelsApiBasedProviderAvailability(
+        // ListModelsApiBasedProviderAvailability may not be available in all bundled versions of the php-ai-client
+        // library included with WordPress, so fall back to a local implementation when it is not found.
+        if (class_exists(ListModelsApiBasedProviderAvailability::class)) {
+            return new ListModelsApiBasedProviderAvailability(
+                static::modelMetadataDirectory()
+            );
+        }
+        return new GoogleProviderAvailability(
             static::modelMetadataDirectory()
         );
     }
