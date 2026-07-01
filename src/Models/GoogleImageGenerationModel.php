@@ -337,7 +337,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         if (isset($predictionData['url']) && is_string($predictionData['url'])) {
             $imageFile = new File($predictionData['url'], $mimeType);
         } elseif (isset($predictionData['bytesBase64Encoded']) && is_string($predictionData['bytesBase64Encoded'])) {
-            $imageFile = new File($predictionData['bytesBase64Encoded'], $mimeType);
+            $imageFile = new File('data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'], $mimeType);
         } else {
             throw ResponseException::fromInvalidData(
                 $this->providerMetadata()->getName(),
