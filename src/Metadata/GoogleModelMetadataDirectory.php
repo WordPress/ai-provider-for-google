@@ -181,6 +181,14 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
             new SupportedOption(OptionEnum::outputMediaAspectRatio(), $geminiImageAspectRatios),
             new SupportedOption(OptionEnum::customOptions()),
         ];
+        $embeddingCapabilities = [
+            CapabilityEnum::embeddingGeneration(),
+        ];
+        $embeddingOptions = [
+            new SupportedOption(OptionEnum::inputModalities(), [[ModalityEnum::text()]]),
+            new SupportedOption(OptionEnum::dimensions()),
+            new SupportedOption(OptionEnum::customOptions()),
+        ];
 
         $modelsData = (array) $responseData['models'];
 
@@ -193,6 +201,8 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                     $geminiMultimodalImageOutputOptions,
                     $imagenCapabilities,
                     $imagenOptions,
+                    $embeddingCapabilities,
+                    $embeddingOptions,
                     $gemini31ImageAspectRatios
                 ): ModelMetadata {
                     $modelId = $modelData['baseModelId'] ?? $modelData['name'];
@@ -238,6 +248,13 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                     ) {
                         $modelCaps = $imagenCapabilities;
                         $modelOptions = $imagenOptions;
+                    } elseif (
+                        isset($modelData['supportedGenerationMethods']) &&
+                        is_array($modelData['supportedGenerationMethods']) &&
+                        in_array('embedContent', $modelData['supportedGenerationMethods'], true)
+                    ) {
+                        $modelCaps = $embeddingCapabilities;
+                        $modelOptions = $embeddingOptions;
                     } else {
                         $modelCaps = [];
                         $modelOptions = [];
