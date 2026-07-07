@@ -60,9 +60,34 @@ $result = AiClient::prompt('Explain quantum computing')
 echo $result->toText();
 ```
 
+### Generating Embeddings
+
+```php
+// Generate a single embedding.
+$embedding = AiClient::prompt('PHP powers a large part of the web.')
+    ->usingProvider('google')
+    ->generateEmbedding();
+
+$values = $embedding->getValues();
+
+// Generate embeddings for multiple inputs in a single batch.
+$embeddings = AiClient::prompt()
+    ->usingProvider('google')
+    ->generateEmbeddings([
+        'PHP powers a large part of the web.',
+        'WordPress makes publishing accessible.',
+    ]);
+
+// Request a specific number of output dimensions (for models that support it).
+$embedding = AiClient::prompt('PHP powers a large part of the web.')
+    ->usingProvider('google')
+    ->usingDimensions(512)
+    ->generateEmbedding();
+```
+
 ## Supported Models
 
-Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support) and Imagen models for image generation. See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
+Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support), Imagen models for image generation, and embedding models (such as `gemini-embedding-001` and `text-embedding-004`) for embedding generation. See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
 
 ## Configuration
 
