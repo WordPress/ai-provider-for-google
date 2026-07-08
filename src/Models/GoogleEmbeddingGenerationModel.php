@@ -27,7 +27,8 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  * @since n.e.x.t
  *
  * @phpstan-type EmbeddingData array{values?: list<float|int>}
- * @phpstan-type ResponseData array{embeddings?: list<EmbeddingData>}
+ * @phpstan-type UsageMetadata array{promptTokenCount?: int}
+ * @phpstan-type ResponseData array{embeddings?: list<EmbeddingData>, usageMetadata?: UsageMetadata}
  */
 class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements EmbeddingGenerationModelInterface
 {
@@ -225,11 +226,20 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
             );
         }
 
-        // The Google API does not return usage metadata for embeddings.
-        $tokenUsage = new TokenUsage(0, 0, 0);
+        /*
+         * Newer models return usage metadata for embeddings, while older models do not.
+         */
+        $promptTokens = 0;
+        if (
+            isset($responseData['usageMetadata']['promptTokenCount']) &&
+            is_int($responseData['usageMetadata']['promptTokenCount'])
+        ) {
+            $promptTokens = $responseData['usageMetadata']['promptTokenCount'];
+        }
+        $tokenUsage = new TokenUsage($promptTokens, 0, $promptTokens);
 
         $additionalData = $responseData;
-        unset($additionalData['embeddings']);
+        unset($additionalData['embeddings'], $additionalData['usageMetadata']);
 
         return new EmbeddingResult(
             '',
