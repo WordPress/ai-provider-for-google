@@ -6,9 +6,8 @@ namespace WordPress\GoogleAiProvider\Tests\unit\Models;
 
 use PHPUnit\Framework\TestCase;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
-use WordPress\AiClient\Messages\DTO\Message;
+use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\MessagePart;
-use WordPress\AiClient\Messages\Enums\MessageRoleEnum;
 use WordPress\AiClient\Providers\DTO\ProviderMetadata;
 use WordPress\AiClient\Providers\Enums\ProviderTypeEnum;
 use WordPress\AiClient\Providers\Http\Contracts\HttpTransporterInterface;
@@ -29,9 +28,7 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
     {
         $model = $this->createExposedModel();
 
-        $params = $model->exposePrepareGenerateEmbeddingsParams([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Search text')])],
-        ]);
+        $params = $model->exposePrepareGenerateEmbeddingsParams([new MessagePart('Search text')]);
 
         $this->assertArrayHasKey('requests', $params);
         $this->assertCount(1, $params['requests']);
@@ -45,11 +42,21 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $model = $this->createExposedModel();
         $model->setConfig(ModelConfig::fromArray(['dimensions' => 3]));
 
-        $params = $model->exposePrepareGenerateEmbeddingsParams([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Search text')])],
-        ]);
+        $params = $model->exposePrepareGenerateEmbeddingsParams([new MessagePart('Search text')]);
 
         $this->assertEquals(3, $params['requests'][0]['outputDimensionality']);
+    }
+
+    public function testPrepareParamsMergesCustomOptions(): void
+    {
+        $model = $this->createExposedModel();
+        $model->setConfig(ModelConfig::fromArray([
+            'customOptions' => ['taskType' => 'RETRIEVAL_QUERY'],
+        ]));
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([new MessagePart('Search text')]);
+
+        $this->assertEquals('RETRIEVAL_QUERY', $params['requests'][0]['taskType']);
     }
 
     public function testPrepareParamsBuildsBatchRequestInOrder(): void
@@ -57,8 +64,8 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $model = $this->createExposedModel();
 
         $params = $model->exposePrepareGenerateEmbeddingsParams([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('First')])],
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Second')])],
+            new MessagePart('First'),
+            new MessagePart('Second'),
         ]);
 
         $this->assertCount(2, $params['requests']);
@@ -96,9 +103,7 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $model->setHttpTransporter($httpTransporter);
         $model->setRequestAuthentication($requestAuthentication);
 
-        $result = $model->generateEmbeddingResult([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Search text')])],
-        ]);
+        $result = $model->generateEmbeddingResult([new MessagePart('Search text')]);
 
         $this->assertCount(1, $result->getEmbeddings());
         $this->assertEquals([0.1, 0.2, 0.3], $result->getEmbedding()->getValues());
@@ -133,8 +138,8 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $model->setRequestAuthentication($requestAuthentication);
 
         $result = $model->generateEmbeddingResult([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('First')])],
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Second')])],
+            new MessagePart('First'),
+            new MessagePart('Second'),
         ]);
 
         $embeddings = $result->getEmbeddings();
@@ -143,22 +148,36 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $this->assertEquals([0.4, 0.5, 0.6], $embeddings[1]->getValues());
     }
 
-    public function testPrepareParamsThrowsOnEmptyPromptList(): void
+    /**
+     * @dataProvider invalidInputs
+     *
+     * @param array<mixed> $input   The invalid embedding input.
+     * @param string       $message The expected exception message.
+     */
+    public function testPrepareParamsRejectsInvalidInputs(array $input, string $message): void
     {
         $model = $this->createExposedModel();
 
         $this->expectException(InvalidArgumentException::class);
-        $model->exposePrepareGenerateEmbeddingsParams([]);
+        $this->expectExceptionMessage($message);
+        $model->exposePrepareGenerateEmbeddingsParams($input);
     }
 
-    public function testPrepareParamsThrowsWhenPromptHasNoText(): void
+    /**
+     * @return array<string, array{0: array<mixed>, 1: string}>
+     */
+    public function invalidInputs(): array
     {
-        $model = $this->createExposedModel();
-
-        $this->expectException(InvalidArgumentException::class);
-        $model->exposePrepareGenerateEmbeddingsParams([
-            [new Message(MessageRoleEnum::user(), [])],
-        ]);
+        return [
+            'empty list' => [[], 'The API requires at least one input.'],
+            'non-list array' => [['first' => new MessagePart('Search text')], 'list of message parts'],
+            'non-message part' => [[1], 'index 0 must be a MessagePart'],
+            'file part' => [
+                [new MessagePart(new File('https://example.com/image.jpg', 'image/jpeg'))],
+                'index 0 must be a text part',
+            ],
+            'blank text part' => [[new MessagePart('   ')], 'index 0 must contain non-empty text'],
+        ];
     }
 
     public function testGenerateEmbeddingResultThrowsWhenResponseMissingEmbeddings(): void
@@ -179,9 +198,7 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $model->setRequestAuthentication($requestAuthentication);
 
         $this->expectException(ResponseException::class);
-        $model->generateEmbeddingResult([
-            [new Message(MessageRoleEnum::user(), [new MessagePart('Search text')])],
-        ]);
+        $model->generateEmbeddingResult([new MessagePart('Search text')]);
     }
 
     /**
@@ -196,12 +213,12 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
             $this->createProviderMetadata()
         ) extends GoogleEmbeddingGenerationModel {
             /**
-             * @param list<list<Message>> $prompts The prompts.
+             * @param list<MessagePart> $input The inputs.
              * @return array<string, mixed> The prepared params.
              */
-            public function exposePrepareGenerateEmbeddingsParams(array $prompts): array
+            public function exposePrepareGenerateEmbeddingsParams(array $input): array
             {
-                return $this->prepareGenerateEmbeddingsParams($prompts);
+                return $this->prepareGenerateEmbeddingsParams($input);
             }
         };
     }

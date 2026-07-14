@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WordPress\GoogleAiProvider\Models;
 
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
-use WordPress\AiClient\Messages\DTO\Message;
+use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Providers\ApiBasedImplementation\AbstractApiBasedModel;
 use WordPress\AiClient\Providers\Http\Contracts\RequestAuthenticationInterface;
 use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
@@ -55,14 +55,14 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
      *
      * @since n.e.x.t
      *
-     * @param list<list<Message>> $prompts The prompts to generate embeddings for, one message list per prompt.
+     * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
      * @return EmbeddingResult The embedding result.
      */
-    public function generateEmbeddingResult(array $prompts): EmbeddingResult
+    public function generateEmbeddingResult(array $input): EmbeddingResult
     {
         $httpTransporter = $this->getHttpTransporter();
 
-        $params = $this->prepareGenerateEmbeddingsParams($prompts);
+        $params = $this->prepareGenerateEmbeddingsParams($input);
 
         $request = new Request(
             HttpMethodEnum::POST(),
@@ -82,21 +82,21 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     }
 
     /**
-     * Prepares the given prompts and the model configuration into parameters for the API request.
+     * Prepares the given inputs and the model configuration into parameters for the API request.
      *
      * @since n.e.x.t
      *
-     * @param list<list<Message>> $prompts The prompts to generate embeddings for, one message list per prompt.
+     * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
      * @return array<string, mixed> The parameters for the API request.
      */
-    protected function prepareGenerateEmbeddingsParams(array $prompts): array
+    protected function prepareGenerateEmbeddingsParams(array $input): array
     {
-        if (!array_is_list($prompts)) {
-            throw new InvalidArgumentException('Embedding input must be provided as a list of prompts.');
+        if (!array_is_list($input)) {
+            throw new InvalidArgumentException('Embedding input must be provided as a list of message parts.');
         }
 
-        if (empty($prompts)) {
-            throw new InvalidArgumentException('The API requires at least one prompt.');
+        if (empty($input)) {
+            throw new InvalidArgumentException('The API requires at least one input.');
         }
 
         $modelName = 'models/' . $this->metadata()->getId();
@@ -104,12 +104,12 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
         $customOptions = $this->getConfig()->getCustomOptions();
 
         $requests = [];
-        foreach ($prompts as $messages) {
+        foreach ($input as $index => $part) {
             $requestEntry = [
                 'model' => $modelName,
                 'content' => [
                     'parts' => [
-                        ['text' => $this->preparePromptInput($messages)],
+                        ['text' => $this->preparePartInput($part, $index)],
                     ],
                 ],
             ];
@@ -137,50 +137,37 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     }
 
     /**
-     * Prepares a single prompt (a list of messages) into one embeddings input string.
+     * Prepares a single input part into one embeddings input string.
      *
      * @since n.e.x.t
      *
-     * @param list<Message> $messages The messages that make up one embedding input.
-     * @return string The prompt text.
+     * @param mixed $part  The message part that makes up one embedding input.
+     * @param int   $index The index of the part within the input list, used for error messages.
+     * @return string The embedding input text.
+     * @throws InvalidArgumentException If the part is not a non-empty text message part.
      */
-    protected function preparePromptInput(array $messages): string
+    protected function preparePartInput($part, int $index): string
     {
-        if (!array_is_list($messages) || empty($messages)) {
-            throw new InvalidArgumentException('Each embedding prompt must be a non-empty list of messages.');
+        if (!$part instanceof MessagePart) {
+            throw new InvalidArgumentException(
+                sprintf('Embedding input at index %d must be a MessagePart.', $index)
+            );
         }
 
-        $textParts = [];
-        foreach ($messages as $message) {
-            $textParts[] = $this->prepareMessageInput($message);
+        if (!$part->getType()->isText()) {
+            throw new InvalidArgumentException(
+                sprintf('Google embedding input at index %d must be a text part.', $index)
+            );
         }
 
-        return implode("\n", $textParts);
-    }
-
-    /**
-     * Prepares a single message for the embeddings input parameter.
-     *
-     * @since n.e.x.t
-     *
-     * @param Message $message The message for one embedding input.
-     * @return string The prompt text.
-     */
-    protected function prepareMessageInput(Message $message): string
-    {
-        $textParts = [];
-        foreach ($message->getParts() as $part) {
-            $text = $part->getText();
-            if ($text !== null) {
-                $textParts[] = $text;
-            }
+        $text = $part->getText();
+        if ($text === null || trim($text) === '') {
+            throw new InvalidArgumentException(
+                sprintf('Google embedding input at index %d must contain non-empty text.', $index)
+            );
         }
 
-        if (empty($textParts)) {
-            throw new InvalidArgumentException('The API requires text content to generate embeddings.');
-        }
-
-        return implode("\n", $textParts);
+        return $text;
     }
 
     /**

@@ -2844,12 +2844,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/chubes4/php-ai-client.git",
-                "reference": "20f6a1ba88bb9b47167c3a3c9ffbf68eafe27e9f"
+                "reference": "e08155bcb28fef5c0cc24b35f450e875204af225"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/chubes4/php-ai-client/zipball/20f6a1ba88bb9b47167c3a3c9ffbf68eafe27e9f",
-                "reference": "20f6a1ba88bb9b47167c3a3c9ffbf68eafe27e9f",
+                "url": "https://api.github.com/repos/chubes4/php-ai-client/zipball/e08155bcb28fef5c0cc24b35f450e875204af225",
+                "reference": "e08155bcb28fef5c0cc24b35f450e875204af225",
                 "shasum": ""
             },
             "require": {
@@ -2945,7 +2945,7 @@
                 "issues": "https://github.com/WordPress/php-ai-client/issues",
                 "source": "https://github.com/WordPress/php-ai-client"
             },
-            "time": "2026-07-07T19:21:29+00:00"
+            "time": "2026-07-14T03:28:09+00:00"
         }
     ],
     "aliases": [
