@@ -64,22 +64,22 @@ echo $result->toText();
 
 ```php
 // Generate a single embedding.
-$embedding = AiClient::prompt('PHP powers a large part of the web.')
+$embedding = AiClient::input('PHP powers a large part of the web.')
     ->usingProvider('google')
     ->generateEmbedding();
 
 $values = $embedding->getValues();
 
 // Generate embeddings for multiple inputs in a single batch.
-$embeddings = AiClient::prompt()
-    ->usingProvider('google')
-    ->generateEmbeddings([
+$embeddings = AiClient::input([
         'PHP powers a large part of the web.',
         'WordPress makes publishing accessible.',
-    ]);
+    ])
+    ->usingProvider('google')
+    ->generateEmbeddings();
 
 // Request a specific number of output dimensions (for models that support it).
-$embedding = AiClient::prompt('PHP powers a large part of the web.')
+$embedding = AiClient::input('PHP powers a large part of the web.')
     ->usingProvider('google')
     ->usingDimensions(512)
     ->generateEmbedding();
