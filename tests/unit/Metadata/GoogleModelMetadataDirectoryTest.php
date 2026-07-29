@@ -7,6 +7,7 @@ namespace WordPress\GoogleAiProvider\Tests\unit\Metadata;
 use PHPUnit\Framework\TestCase;
 use WordPress\AiClient\Providers\Http\DTO\Response;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
+use WordPress\AiClient\Providers\Models\EmbeddingGeneration\Contracts\EmbeddingGenerationModelInterface;
 use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
 
 /**
@@ -15,6 +16,41 @@ use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
 class GoogleModelMetadataDirectoryTest extends TestCase
 {
     public function testEmbeddingModelsAdvertiseEmbeddingCapability(): void
+    {
+        if (!interface_exists(EmbeddingGenerationModelInterface::class)) {
+            $this->markTestSkipped('Embedding generation requires PHP AI Client 1.4.0 or later.');
+        }
+
+        $embeddingModel = $this->parseEmbeddingModel();
+
+        $capabilities = $embeddingModel->getSupportedCapabilities();
+        $this->assertCount(1, $capabilities);
+        $this->assertTrue($capabilities[0]->isEmbeddingGeneration());
+
+        $options = $embeddingModel->getSupportedOptions();
+        $this->assertTrue($options[0]->getName()->isInputModalities());
+        $this->assertTrue($options[1]->getName()->isDimensions());
+        $this->assertTrue($options[2]->getName()->isCustomOptions());
+    }
+
+    public function testEmbeddingModelsAdvertiseNoCapabilitiesWithoutClientSupport(): void
+    {
+        if (interface_exists(EmbeddingGenerationModelInterface::class)) {
+            $this->markTestSkipped('The installed PHP AI Client supports embedding generation.');
+        }
+
+        $embeddingModel = $this->parseEmbeddingModel();
+
+        $this->assertSame([], $embeddingModel->getSupportedCapabilities());
+        $this->assertSame([], $embeddingModel->getSupportedOptions());
+    }
+
+    /**
+     * Parses a models response payload and returns the embedding model's metadata.
+     *
+     * @return ModelMetadata The embedding model metadata.
+     */
+    private function parseEmbeddingModel(): ModelMetadata
     {
         $models = $this->parseModels([
             'models' => [
@@ -34,14 +70,7 @@ class GoogleModelMetadataDirectoryTest extends TestCase
         $embeddingModel = $this->findModel($models, 'text-embedding-004');
         $this->assertInstanceOf(ModelMetadata::class, $embeddingModel);
 
-        $capabilities = $embeddingModel->getSupportedCapabilities();
-        $this->assertCount(1, $capabilities);
-        $this->assertTrue($capabilities[0]->isEmbeddingGeneration());
-
-        $options = $embeddingModel->getSupportedOptions();
-        $this->assertTrue($options[0]->getName()->isInputModalities());
-        $this->assertTrue($options[1]->getName()->isDimensions());
-        $this->assertTrue($options[2]->getName()->isCustomOptions());
+        return $embeddingModel;
     }
 
     public function testTextModelsAreUnaffected(): void
