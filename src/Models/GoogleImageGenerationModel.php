@@ -82,14 +82,16 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         // TODO: Remove this workaround soon - here just for backward compatibility when
         // GoogleTextAndImageGenerationModel did not exist.
         if (str_starts_with($this->metadata()->getId(), 'gemini-')) {
-            _doing_it_wrong(
-                __METHOD__,
-                sprintf(
-                    'Gemini image models should be used via %s going forward.',
-                    GoogleTextAndImageGenerationModel::class
-                ),
-                '1.1.0'
-            );
+            if (function_exists('_doing_it_wrong')) {
+                _doing_it_wrong(
+                    __METHOD__,
+                    sprintf(
+                        'Gemini image models should be used via %s going forward.',
+                        GoogleTextAndImageGenerationModel::class
+                    ),
+                    '1.1.0'
+                );
+            }
             $multimodalOutputModel = new GoogleTextGenerationModel($this->metadata(), $this->providerMetadata());
             $multimodalOutputModel->setConfig($this->getConfig());
             $multimodalOutputModel->setHttpTransporter($this->getHttpTransporter());
