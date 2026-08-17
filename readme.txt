@@ -48,6 +48,16 @@ No, this plugin requires the PHP AI Client plugin to be installed and activated.
 
 == Changelog ==
 
+= 1.1.1 - 2026-08-17 =
+
+**Changed**
+
+* Bumped WordPress tested-up-to version 7.1 ([#39](https://github.com/WordPress/ai-provider-for-google/pull/39)).
+
+**Fixed**
+
+* Prevented PHP warning and error-log spam when processing base64-encoded images returned by Google AI ([#29](https://github.com/WordPress/ai-provider-for-google/pull/29)).
+
 = 1.1.0 =
 
 * Add support for aspect ratios with Gemini (multimodal) image generation ([#13](https://github.com/WordPress/ai-provider-for-google/pull/13)).
