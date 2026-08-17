@@ -1,12 +1,12 @@
 === AI Provider for Google ===
-Contributors: wordpressdotorg
-Tags: ai, google, gemini, artificial-intelligence, connector
+Contributors:      wordpressdotorg
+Tags:              ai, google, gemini, artificial-intelligence, connector
 Requires at least: 6.9
-Tested up to: 7.1
-Stable tag: 1.1.0
-Requires PHP: 7.4
-License: GPL-2.0-or-later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Tested up to:      7.1
+Stable tag:        1.1.1
+Requires PHP:      7.4
+License:           GPL-2.0-or-later
+License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
 Google AI (Gemini) provider for the PHP AI Client SDK.
 
