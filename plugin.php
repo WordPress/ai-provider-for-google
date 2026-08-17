@@ -1,17 +1,17 @@
 <?php
 
 /**
- * Plugin Name: AI Provider for Google
- * Plugin URI: https://github.com/WordPress/ai-provider-for-google
- * Description: AI Provider for Google for the WordPress AI Client.
+ * Plugin Name:       AI Provider for Google
+ * Plugin URI:        https://github.com/WordPress/ai-provider-for-google
+ * Description:       AI Provider for Google for the WordPress AI Client.
  * Requires at least: 6.9
- * Requires PHP: 7.4
- * Version: 1.1.0
- * Author: WordPress AI Team
- * Author URI: https://make.wordpress.org/ai/
- * License: GPL-2.0-or-later
- * License URI: https://spdx.org/licenses/GPL-2.0-or-later.html
- * Text Domain: ai-provider-for-google
+ * Requires PHP:      7.4
+ * Version:           1.1.1
+ * Author:            WordPress AI Team
+ * Author URI:        https://make.wordpress.org/ai/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
+ * Text Domain:       ai-provider-for-google
  *
  * @package WordPress\GoogleAiProvider
  */
