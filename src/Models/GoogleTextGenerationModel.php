@@ -46,7 +46,8 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  * @phpstan-type UsageData array{
  *     promptTokenCount?: int,
  *     candidatesTokenCount?: int,
- *     thoughtsTokenCount?: int
+ *     thoughtsTokenCount?: int,
+ *     totalTokenCount?: int
  * }
  * @phpstan-type ResponseData array{
  *     id?: string,
@@ -578,10 +579,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         if (isset($responseData['usageMetadata']) && is_array($responseData['usageMetadata'])) {
             $usage = $responseData['usageMetadata'];
 
+            $promptTokenCount = $usage['promptTokenCount'] ?? 0;
+            $candidatesTokenCount = $usage['candidatesTokenCount'] ?? 0;
+            $thoughtsTokenCount = $usage['thoughtsTokenCount'] ?? 0;
+
+            // Prefer Google's authoritative total when it is available. Older API responses may omit it.
+            $totalTokenCount = $usage['totalTokenCount'] ??
+                ($promptTokenCount + $candidatesTokenCount + $thoughtsTokenCount);
+
             $tokenUsage = new TokenUsage(
-                $usage['promptTokenCount'] ?? 0,
-                $usage['candidatesTokenCount'] ?? 0,
-                ($usage['candidatesTokenCount'] ?? 0) + ($usage['thoughtsTokenCount'] ?? 0)
+                $promptTokenCount,
+                $candidatesTokenCount,
+                $totalTokenCount
             );
         } else {
             $tokenUsage = new TokenUsage(0, 0, 0);
