@@ -18,6 +18,7 @@ use WordPress\AiClient\Providers\Models\DTO\ModelConfig;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
 use WordPress\AiClient\Providers\Models\EmbeddingGeneration\Contracts\EmbeddingGenerationModelInterface;
 use WordPress\AiClient\Providers\Models\Enums\CapabilityEnum;
+use WordPress\AiClient\Tools\DTO\FunctionCall;
 use WordPress\GoogleAiProvider\Models\GoogleEmbeddingGenerationModel;
 
 /**
@@ -48,7 +49,7 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
 
         $this->assertArrayHasKey('requests', $params);
         $this->assertCount(1, $params['requests']);
-        $this->assertEquals('models/text-embedding-004', $params['requests'][0]['model']);
+        $this->assertEquals('models/gemini-embedding-2', $params['requests'][0]['model']);
         $this->assertEquals('Search text', $params['requests'][0]['content']['parts'][0]['text']);
         $this->assertArrayNotHasKey('outputDimensionality', $params['requests'][0]);
     }
@@ -164,6 +165,143 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
         $this->assertEquals([0.4, 0.5, 0.6], $embeddings[1]->getValues());
     }
 
+    public function testPrepareParamsBuildsInlineDataForInlineFileParts(): void
+    {
+        $model = $this->createExposedModel();
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([
+            new MessagePart(new File('data:image/png;base64,iVBORw0KGgo=')),
+        ]);
+
+        $part = $params['requests'][0]['content']['parts'][0];
+        $this->assertArrayHasKey('inlineData', $part);
+        $this->assertEquals('image/png', $part['inlineData']['mimeType']);
+        $this->assertEquals('iVBORw0KGgo=', $part['inlineData']['data']);
+        $this->assertArrayNotHasKey('text', $part);
+    }
+
+    public function testPrepareParamsBuildsFileDataForRemoteFileParts(): void
+    {
+        $model = $this->createExposedModel();
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([
+            new MessagePart(new File('https://example.com/photo.jpg', 'image/jpeg')),
+        ]);
+
+        $part = $params['requests'][0]['content']['parts'][0];
+        $this->assertArrayHasKey('fileData', $part);
+        $this->assertEquals('image/jpeg', $part['fileData']['mimeType']);
+        $this->assertEquals('https://example.com/photo.jpg', $part['fileData']['fileUri']);
+    }
+
+    public function testPrepareParamsBuildsMixedTextAndFileBatchInOrder(): void
+    {
+        $model = $this->createExposedModel();
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([
+            new MessagePart('Some text'),
+            new MessagePart(new File('https://example.com/clip.mp4', 'video/mp4')),
+            new MessagePart('More text'),
+        ]);
+
+        $this->assertCount(3, $params['requests']);
+        $this->assertEquals('Some text', $params['requests'][0]['content']['parts'][0]['text']);
+        $this->assertEquals(
+            'https://example.com/clip.mp4',
+            $params['requests'][1]['content']['parts'][0]['fileData']['fileUri']
+        );
+        $this->assertEquals('More text', $params['requests'][2]['content']['parts'][0]['text']);
+    }
+
+    public function testPrepareParamsAppliesDimensionsToEveryInputInBatch(): void
+    {
+        $model = $this->createExposedModel();
+        $model->setConfig(ModelConfig::fromArray(['dimensions' => 768]));
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([
+            new MessagePart('First'),
+            new MessagePart(new File('https://example.com/photo.jpg', 'image/jpeg')),
+        ]);
+
+        $this->assertEquals(768, $params['requests'][0]['outputDimensionality']);
+        $this->assertEquals(768, $params['requests'][1]['outputDimensionality']);
+    }
+
+    public function testPrepareParamsRejectsConflictingCustomOption(): void
+    {
+        $model = $this->createExposedModel();
+        $model->setConfig(ModelConfig::fromArray([
+            'customOptions' => ['content' => 'clobbered'],
+        ]));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('conflicts with an existing parameter');
+        $model->exposePrepareGenerateEmbeddingsParams([new MessagePart('Search text')]);
+    }
+
+    public function testGenerateEmbeddingResultReportsPromptTokensWhenPresent(): void
+    {
+        $model = new GoogleEmbeddingGenerationModel(
+            $this->createModelMetadata(),
+            $this->createProviderMetadata()
+        );
+        $httpTransporter = $this->createMock(HttpTransporterInterface::class);
+        $requestAuthentication = $this->createMock(RequestAuthenticationInterface::class);
+
+        $requestAuthentication->method('authenticateRequest')->willReturnArgument(0);
+        $httpTransporter
+            ->method('send')
+            ->willReturn(new Response(
+                200,
+                [],
+                json_encode([
+                    'embeddings' => [['values' => [0.1, 0.2]]],
+                    'usageMetadata' => ['promptTokenCount' => 258],
+                ])
+            ));
+
+        $model->setHttpTransporter($httpTransporter);
+        $model->setRequestAuthentication($requestAuthentication);
+
+        $result = $model->generateEmbeddingResult([new MessagePart('Search text')]);
+
+        $this->assertEquals(258, $result->getTokenUsage()->getPromptTokens());
+        $this->assertEquals(258, $result->getTokenUsage()->getTotalTokens());
+    }
+
+    public function testGenerateEmbeddingResultSendsRequestToBatchEndpoint(): void
+    {
+        $model = new GoogleEmbeddingGenerationModel(
+            $this->createModelMetadata(),
+            $this->createProviderMetadata()
+        );
+        $httpTransporter = $this->createMock(HttpTransporterInterface::class);
+        $requestAuthentication = $this->createMock(RequestAuthenticationInterface::class);
+
+        $requestAuthentication->method('authenticateRequest')->willReturnArgument(0);
+        $httpTransporter
+            ->expects($this->once())
+            ->method('send')
+            ->with($this->callback(function ($request): bool {
+                $this->assertStringEndsWith(
+                    'models/gemini-embedding-2:batchEmbedContents',
+                    $request->getUri()
+                );
+                $this->assertTrue($request->getMethod()->isPost());
+                return true;
+            }))
+            ->willReturn(new Response(
+                200,
+                [],
+                json_encode(['embeddings' => [['values' => [0.1, 0.2]]]])
+            ));
+
+        $model->setHttpTransporter($httpTransporter);
+        $model->setRequestAuthentication($requestAuthentication);
+
+        $model->generateEmbeddingResult([new MessagePart('Search text')]);
+    }
+
     /**
      * @dataProvider invalidInputs
      *
@@ -188,9 +326,9 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
             'empty list' => [[], 'The API requires at least one input.'],
             'non-list array' => [['first' => new MessagePart('Search text')], 'list of message parts'],
             'non-message part' => [[1], 'index 0 must be a MessagePart'],
-            'file part' => [
-                [new MessagePart(new File('https://example.com/image.jpg', 'image/jpeg'))],
-                'index 0 must be a text part',
+            'function call part' => [
+                [new MessagePart(new FunctionCall('call-1', 'doThing'))],
+                'index 0 must be a text or file part',
             ],
             'blank text part' => [[new MessagePart('   ')], 'index 0 must contain non-empty text'],
         ];
@@ -242,8 +380,8 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
     private function createModelMetadata(): ModelMetadata
     {
         return new ModelMetadata(
-            'text-embedding-004',
-            'text-embedding-004',
+            'gemini-embedding-2',
+            'gemini-embedding-2',
             [CapabilityEnum::embeddingGeneration()],
             []
         );

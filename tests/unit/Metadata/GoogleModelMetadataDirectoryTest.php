@@ -31,6 +31,90 @@ class GoogleModelMetadataDirectoryTest extends TestCase
         $this->assertTrue($options[0]->getName()->isInputModalities());
         $this->assertTrue($options[1]->getName()->isDimensions());
         $this->assertTrue($options[2]->getName()->isCustomOptions());
+
+        // Text-only models must advertise exactly one combination, otherwise the model resolver
+        // would route image or video inputs to a model that cannot accept them.
+        $this->assertSame([['text']], $this->inputModalityCombinations($embeddingModel));
+    }
+
+    public function testMultimodalEmbeddingModelsAdvertiseEveryModalityCombination(): void
+    {
+        if (!interface_exists(EmbeddingGenerationModelInterface::class)) {
+            $this->markTestSkipped('Embedding generation requires PHP AI Client 1.4.0 or later.');
+        }
+
+        $models = $this->parseModels([
+            'models' => [
+                [
+                    'name' => 'models/gemini-embedding-2',
+                    'displayName' => 'Gemini Embedding 2',
+                    'supportedGenerationMethods' => ['embedContent'],
+                ],
+            ],
+        ]);
+
+        $model = $this->findModel($models, 'gemini-embedding-2');
+        $this->assertInstanceOf(ModelMetadata::class, $model);
+
+        $combinations = $this->inputModalityCombinations($model);
+
+        // Every non-empty subset of the five supported modalities.
+        $this->assertCount(31, $combinations);
+        $this->assertContains(['text'], $combinations);
+        $this->assertContains(['image'], $combinations);
+        $this->assertContains(['audio'], $combinations);
+        $this->assertContains(['video'], $combinations);
+        $this->assertContains(['document'], $combinations);
+        $this->assertContains(['text', 'image'], $combinations);
+        $this->assertContains(['text', 'image', 'audio', 'video', 'document'], $combinations);
+    }
+
+    public function testPreviewMultimodalEmbeddingModelIsTreatedAsMultimodal(): void
+    {
+        if (!interface_exists(EmbeddingGenerationModelInterface::class)) {
+            $this->markTestSkipped('Embedding generation requires PHP AI Client 1.4.0 or later.');
+        }
+
+        $models = $this->parseModels([
+            'models' => [
+                [
+                    'name' => 'models/gemini-embedding-2-preview',
+                    'supportedGenerationMethods' => ['embedContent'],
+                ],
+            ],
+        ]);
+
+        $model = $this->findModel($models, 'gemini-embedding-2-preview');
+        $this->assertInstanceOf(ModelMetadata::class, $model);
+        $this->assertContains(['image'], $this->inputModalityCombinations($model));
+    }
+
+    /**
+     * Returns the advertised input modality combinations as plain string values.
+     *
+     * @param ModelMetadata $model The model metadata to inspect.
+     * @return list<list<string>> The advertised input modality combinations.
+     */
+    private function inputModalityCombinations(ModelMetadata $model): array
+    {
+        foreach ($model->getSupportedOptions() as $option) {
+            if (!$option->getName()->isInputModalities()) {
+                continue;
+            }
+
+            $combinations = [];
+            foreach ((array) $option->getSupportedValues() as $combination) {
+                $combinations[] = array_map(
+                    static function ($modality): string {
+                        return $modality->value;
+                    },
+                    $combination
+                );
+            }
+            return $combinations;
+        }
+
+        return [];
     }
 
     public function testEmbeddingModelsAdvertiseNoCapabilitiesWithoutClientSupport(): void
@@ -55,8 +139,8 @@ class GoogleModelMetadataDirectoryTest extends TestCase
         $models = $this->parseModels([
             'models' => [
                 [
-                    'name' => 'models/text-embedding-004',
-                    'displayName' => 'Text Embedding 004',
+                    'name' => 'models/gemini-embedding-001',
+                    'displayName' => 'Gemini Embedding 001',
                     'supportedGenerationMethods' => ['embedContent', 'countTextTokens'],
                 ],
                 [
@@ -67,7 +151,7 @@ class GoogleModelMetadataDirectoryTest extends TestCase
             ],
         ]);
 
-        $embeddingModel = $this->findModel($models, 'text-embedding-004');
+        $embeddingModel = $this->findModel($models, 'gemini-embedding-001');
         $this->assertInstanceOf(ModelMetadata::class, $embeddingModel);
 
         return $embeddingModel;
@@ -78,7 +162,7 @@ class GoogleModelMetadataDirectoryTest extends TestCase
         $models = $this->parseModels([
             'models' => [
                 [
-                    'name' => 'models/text-embedding-004',
+                    'name' => 'models/gemini-embedding-001',
                     'supportedGenerationMethods' => ['embedContent'],
                 ],
                 [
