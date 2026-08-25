@@ -46,7 +46,8 @@ class GoogleTextAndImageGenerationModel implements
      * @param ModelMetadata    $metadata         The metadata for the model.
      * @param ProviderMetadata $providerMetadata The metadata for the model's provider.
      */
-    public function __construct(ModelMetadata $metadata, ProviderMetadata $providerMetadata) {
+    public function __construct(ModelMetadata $metadata, ProviderMetadata $providerMetadata)
+    {
         $this->model = new GoogleTextGenerationModel($metadata, $providerMetadata);
     }
 

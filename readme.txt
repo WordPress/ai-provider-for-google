@@ -1,12 +1,12 @@
 === AI Provider for Google ===
-Contributors: wordpressdotorg
-Tags: ai, google, gemini, artificial-intelligence, connector
+Contributors:      wordpressdotorg
+Tags:              ai, google, gemini, artificial-intelligence, connector
 Requires at least: 6.9
-Tested up to: 7.0
-Stable tag: 1.1.0
-Requires PHP: 7.4
-License: GPL-2.0-or-later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Tested up to:      7.1
+Stable tag:        1.1.1
+Requires PHP:      7.4
+License:           GPL-2.0-or-later
+License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
 Google AI (Gemini) provider for the PHP AI Client SDK.
 
@@ -47,6 +47,16 @@ Visit the [Google AI Studio](https://aistudio.google.com/) to create an API key 
 No, this plugin requires the PHP AI Client plugin to be installed and activated. It provides the Google-specific implementation that the PHP AI Client uses.
 
 == Changelog ==
+
+= 1.1.1 - 2026-08-17 =
+
+**Changed**
+
+* Bumped WordPress tested-up-to version 7.1 ([#39](https://github.com/WordPress/ai-provider-for-google/pull/39)).
+
+**Fixed**
+
+* Prevented PHP warning and error-log spam when processing base64-encoded images returned by Google AI ([#29](https://github.com/WordPress/ai-provider-for-google/pull/29)).
 
 = 1.1.0 =
 
