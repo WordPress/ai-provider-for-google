@@ -32,6 +32,8 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  */
 class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements EmbeddingGenerationModelInterface
 {
+    use WithMessagePartDataTrait;
+
     /**
      * {@inheritDoc}
      *
@@ -109,7 +111,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
                 'model' => $modelName,
                 'content' => [
                     'parts' => [
-                        ['text' => $this->preparePartInput($part, $index)],
+                        $this->preparePartData($part, $index),
                     ],
                 ],
             ];
@@ -137,16 +139,19 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     }
 
     /**
-     * Prepares a single input part into one embeddings input string.
+     * Prepares a single input part into the Google API request part for one embedding input.
+     *
+     * Text and file parts are both supported. Whether the model actually accepts a given file
+     * modality is determined by the model's declared input modalities, not here.
      *
      * @since n.e.x.t
      *
      * @param mixed $part  The message part that makes up one embedding input.
      * @param int   $index The index of the part within the input list, used for error messages.
-     * @return string The embedding input text.
-     * @throws InvalidArgumentException If the part is not a non-empty text message part.
+     * @return array<string, mixed> The Google API request part.
+     * @throws InvalidArgumentException If the part is not a supported, non-empty message part.
      */
-    protected function preparePartInput($part, int $index): string
+    protected function preparePartData($part, int $index): array
     {
         if (!$part instanceof MessagePart) {
             throw new InvalidArgumentException(
@@ -154,20 +159,30 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
             );
         }
 
-        if (!$part->getType()->isText()) {
+        $type = $part->getType();
+        if (!$type->isText() && !$type->isFile()) {
             throw new InvalidArgumentException(
-                sprintf('Google embedding input at index %d must be a text part.', $index)
+                sprintf('Google embedding input at index %d must be a text or file part.', $index)
             );
         }
 
-        $text = $part->getText();
-        if ($text === null || trim($text) === '') {
+        if ($type->isText()) {
+            $text = $part->getText();
+            if ($text === null || trim($text) === '') {
+                throw new InvalidArgumentException(
+                    sprintf('Google embedding input at index %d must contain non-empty text.', $index)
+                );
+            }
+        }
+
+        $partData = $this->getMessagePartData($part);
+        if ($partData === null) {
             throw new InvalidArgumentException(
-                sprintf('Google embedding input at index %d must contain non-empty text.', $index)
+                sprintf('Google embedding input at index %d could not be prepared.', $index)
             );
         }
 
-        return $text;
+        return $partData;
     }
 
     /**

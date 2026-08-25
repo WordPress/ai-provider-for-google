@@ -18,7 +18,7 @@ This plugin provides Google AI (Gemini) integration for the PHP AI Client SDK. I
 
 * Text generation with Gemini models
 * Image generation with Imagen models
-* Embedding generation with any embedding-capable Google model
+* Embedding generation with any embedding-capable Google model, including multimodal embeddings from images, audio, video, and PDF documents
 * Function calling support
 * Automatic provider registration
 

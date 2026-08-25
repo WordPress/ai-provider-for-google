@@ -186,12 +186,27 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
         $supportsEmbeddingGeneration = interface_exists(EmbeddingGenerationModelInterface::class);
         $embeddingCapabilities = [];
         $embeddingOptions = [];
+        $multimodalEmbeddingOptions = [];
         if ($supportsEmbeddingGeneration) {
             $embeddingCapabilities = [
                 CapabilityEnum::embeddingGeneration(),
             ];
             $embeddingOptions = [
                 new SupportedOption(OptionEnum::inputModalities(), [[ModalityEnum::text()]]),
+                new SupportedOption(OptionEnum::dimensions()),
+                new SupportedOption(OptionEnum::customOptions()),
+            ];
+            $multimodalEmbeddingOptions = [
+                new SupportedOption(
+                    OptionEnum::inputModalities(),
+                    self::buildInputModalityCombinations([
+                        ModalityEnum::text(),
+                        ModalityEnum::image(),
+                        ModalityEnum::audio(),
+                        ModalityEnum::video(),
+                        ModalityEnum::document(),
+                    ])
+                ),
                 new SupportedOption(OptionEnum::dimensions()),
                 new SupportedOption(OptionEnum::customOptions()),
             ];
@@ -210,6 +225,7 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                     $imagenOptions,
                     $embeddingCapabilities,
                     $embeddingOptions,
+                    $multimodalEmbeddingOptions,
                     $gemini31ImageAspectRatios
                 ): ModelMetadata {
                     $modelId = $modelData['baseModelId'] ?? $modelData['name'];
@@ -261,7 +277,16 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                         in_array('embedContent', $modelData['supportedGenerationMethods'], true)
                     ) {
                         $modelCaps = $embeddingCapabilities;
-                        $modelOptions = $embeddingOptions;
+                        /*
+                         * Only the gemini-embedding-2 line accepts non-text input. Earlier embedding
+                         * models are text-only and reject file parts with an API error that does not
+                         * explain the actual problem, so they must not advertise other modalities.
+                         */
+                        if (str_starts_with($modelId, 'gemini-embedding-2')) {
+                            $modelOptions = $multimodalEmbeddingOptions;
+                        } else {
+                            $modelOptions = $embeddingOptions;
+                        }
                     } else {
                         $modelCaps = [];
                         $modelOptions = [];
@@ -366,5 +391,33 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
 
         // Fallback: Sort alphabetically.
         return strcmp($a->getId(), $b->getId());
+    }
+
+    /**
+     * Builds every non-empty combination of the given input modalities.
+     *
+     * Embedding inputs are independent items rather than a single conversation, so one request may
+     * mix any subset of the modalities a model accepts. Option matching compares the required
+     * modality set for exact equality, so each subset has to be advertised individually.
+     *
+     * @since n.e.x.t
+     *
+     * @param list<ModalityEnum> $modalities The input modalities the model accepts.
+     * @return list<list<ModalityEnum>> All non-empty combinations of the given modalities.
+     */
+    private static function buildInputModalityCombinations(array $modalities): array
+    {
+        $combinations = [];
+        $combinationCount = 1 << count($modalities);
+        for ($mask = 1; $mask < $combinationCount; $mask++) {
+            $combination = [];
+            foreach ($modalities as $position => $modality) {
+                if ($mask & (1 << $position)) {
+                    $combination[] = $modality;
+                }
+            }
+            $combinations[] = $combination;
+        }
+        return $combinations;
     }
 }
