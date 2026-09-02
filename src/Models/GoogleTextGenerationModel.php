@@ -213,9 +213,12 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             $params['generationConfig'] = $generationConfig;
         }
 
+        $customOptions = $config->getCustomOptions();
+
         $tools = [];
 
         $functionDeclarations = $config->getFunctionDeclarations();
+        $hasFunctionDeclarations = is_array($functionDeclarations) && $functionDeclarations !== [];
         if (is_array($functionDeclarations)) {
             $tools[] = [
                 'functionDeclarations' => $this->prepareFunctionDeclarationsParam($functionDeclarations),
@@ -230,13 +233,26 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
 
         if ($tools) {
             $params['tools'] = $tools;
+
+            /*
+             * The Google AI API refuses to combine a built-in server-side tool (such as
+             * `googleSearch`) with function calling unless server-side tool invocations are
+             * explicitly opted into, failing the request with "Please enable
+             * tool_config.include_server_side_tool_invocations to use Built-in tools with
+             * Function calling.". With the flag set, the API echoes each server-side
+             * invocation back as `toolCall` and `toolResponse` response parts, which
+             * parseResponseCandidateMessagePart() skips since they are not actionable by the
+             * client. A `toolConfig` passed through custom options takes precedence.
+             */
+            if ($webSearch && $hasFunctionDeclarations && !isset($customOptions['toolConfig'])) {
+                $params['toolConfig'] = ['includeServerSideToolInvocations' => true];
+            }
         }
 
         /*
          * Any custom options are added to the parameters as well.
          * This allows developers to pass other options that may be more niche or not yet supported by the SDK.
          */
-        $customOptions = $config->getCustomOptions();
         foreach ($customOptions as $key => $value) {
             // Special case: Support custom values as part of `generationConfig`.
             if (str_starts_with($key, 'generationConfig.')) {
@@ -723,7 +739,10 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $parts = [];
         foreach ($messageData['parts'] as $partIndex => $messagePartData) {
             try {
-                $parts[] = $this->parseResponseCandidateMessagePart($messagePartData);
+                $part = $this->parseResponseCandidateMessagePart($messagePartData);
+                if ($part !== null) {
+                    $parts[] = $part;
+                }
             } catch (InvalidArgumentException $e) {
                 throw ResponseException::fromInvalidData(
                     $this->providerMetadata()->getName(),
@@ -742,10 +761,25 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      * @since 1.0.0
      *
      * @param array<string, mixed> $partData The message part data from the API response.
-     * @return MessagePart The parsed message part.
+     * @return MessagePart|null The parsed message part, or null to ignore.
      */
-    protected function parseResponseCandidateMessagePart(array $partData): MessagePart
+    protected function parseResponseCandidateMessagePart(array $partData): ?MessagePart
     {
+        /*
+         * Built-in server-side tools (such as `googleSearch`) are echoed back as `toolCall` and
+         * `toolResponse` parts when `toolConfig.includeServerSideToolInvocations` is enabled,
+         * which is required to combine them with function calling. The tool has already run on
+         * Google's side, so there is nothing for the client to act on. The grounded answer
+         * arrives in the sibling text parts, so these parts are skipped rather than failing the
+         * entire response.
+         */
+        if (isset($partData['toolCall']) || isset($partData['toolResponse'])) {
+            return null;
+        }
+        // A part may consist of nothing but a thought signature, which has no content to parse.
+        if (isset($partData['thoughtSignature']) && count($partData) === 1) {
+            return null;
+        }
         if (isset($partData['text'])) {
             if (!is_string($partData['text'])) {
                 throw new InvalidArgumentException('Part has an invalid text shape.');
