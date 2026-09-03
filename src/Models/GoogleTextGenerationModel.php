@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WordPress\GoogleAiProvider\Models;
 
-use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
 use WordPress\AiClient\Common\Exception\RuntimeException;
 use WordPress\AiClient\Files\DTO\File;
@@ -325,14 +324,14 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $type = $part->getType();
         if ($type->isText()) {
             if ($part->getChannel()->isThought()) {
-                return [
+                return $this->addThoughtSignatureToPartData([
                     'text'    => $part->getText(),
                     'thought' => true,
-                ];
+                ], $part);
             }
-            return [
+            return $this->addThoughtSignatureToPartData([
                 'text' => $part->getText(),
-            ];
+            ], $part);
         }
         if ($type->isFile()) {
             $file = $part->getFile();
@@ -352,18 +351,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 }
                 // Special case for YouTube video URLs.
                 if (preg_match('/^https?:\/\/(?:www\.)?(?:m\.)?(?:youtu\.be\/|youtube\.com\/)/', $fileUrl)) {
-                    return [
+                    return $this->addThoughtSignatureToPartData([
                         'fileData' => [
                             'fileUri' => $fileUrl,
                         ],
-                    ];
+                    ], $part);
                 }
-                return [
+                return $this->addThoughtSignatureToPartData([
                     'fileData' => [
                         'mimeType' => $file->getMimeType(),
                         'fileUri' => $fileUrl,
                     ],
-                ];
+                ], $part);
             }
             // Else, it is an inline file.
             $fileBase64Data = $file->getBase64Data();
@@ -373,12 +372,12 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     'The inline file must contain base64 data.'
                 );
             }
-            return [
+            return $this->addThoughtSignatureToPartData([
                 'inlineData' => [
                     'mimeType' => $file->getMimeType(),
                     'data' => $fileBase64Data,
                 ],
-            ];
+            ], $part);
         }
         if ($type->isFunctionCall()) {
             $functionCall = $part->getFunctionCall();
@@ -440,6 +439,25 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 $type
             )
         );
+    }
+
+    /**
+     * Adds the thought signature to a Google message part when present.
+     *
+     * @since n.e.x.t
+     *
+     * @param array<string, mixed> $partData The Google API part payload.
+     * @param MessagePart          $part     The source message part.
+     * @return array<string, mixed> The part payload, with the thought signature when available.
+     */
+    protected function addThoughtSignatureToPartData(array $partData, MessagePart $part): array
+    {
+        $thoughtSignature = $this->getMessagePartThoughtSignature($part);
+        if ($thoughtSignature !== null) {
+            $partData['thoughtSignature'] = $thoughtSignature;
+        }
+
+        return $partData;
     }
 
     /**
@@ -594,15 +612,17 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             $promptTokenCount = $usage['promptTokenCount'] ?? 0;
             $candidatesTokenCount = $usage['candidatesTokenCount'] ?? 0;
             $thoughtsTokenCount = $usage['thoughtsTokenCount'] ?? 0;
+            $completionTokenCount = $candidatesTokenCount + $thoughtsTokenCount;
 
             // Prefer Google's authoritative total when it is available. Older API responses may omit it.
             $totalTokenCount = $usage['totalTokenCount'] ??
-                ($promptTokenCount + $candidatesTokenCount + $thoughtsTokenCount);
+                ($promptTokenCount + $completionTokenCount);
 
             $tokenUsage = new TokenUsage(
                 $promptTokenCount,
-                $candidatesTokenCount,
-                $totalTokenCount
+                $completionTokenCount,
+                $totalTokenCount,
+                $thoughtsTokenCount
             );
         } else {
             $tokenUsage = new TokenUsage(0, 0, 0);
@@ -746,14 +766,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      */
     protected function parseResponseCandidateMessagePart(array $partData): MessagePart
     {
+        $thoughtSignature = isset($partData['thoughtSignature']) && is_string($partData['thoughtSignature'])
+            ? $partData['thoughtSignature']
+            : null;
+
         if (isset($partData['text'])) {
             if (!is_string($partData['text'])) {
                 throw new InvalidArgumentException('Part has an invalid text shape.');
             }
             if (isset($partData['thought']) && $partData['thought']) {
-                return new MessagePart($partData['text'], MessagePartChannelEnum::thought());
+                return new MessagePart($partData['text'], MessagePartChannelEnum::thought(), $thoughtSignature);
             }
-            return new MessagePart($partData['text']);
+            return new MessagePart($partData['text'], null, $thoughtSignature);
         }
         if (isset($partData['inlineData'])) {
             if (
@@ -769,7 +793,9 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     isset($partData['inlineData']['mimeType']) && is_string($partData['inlineData']['mimeType']) ?
                         $partData['inlineData']['mimeType'] :
                         null
-                )
+                ),
+                null,
+                $thoughtSignature
             );
         }
         if (isset($partData['fileData'])) {
@@ -786,7 +812,9 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     isset($partData['fileData']['mimeType']) && is_string($partData['fileData']['mimeType']) ?
                         $partData['fileData']['mimeType'] :
                         null
-                )
+                ),
+                null,
+                $thoughtSignature
             );
         }
         if (isset($partData['functionCall'])) {
