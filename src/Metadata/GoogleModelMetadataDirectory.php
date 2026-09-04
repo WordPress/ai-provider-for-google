@@ -211,6 +211,18 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                 new SupportedOption(OptionEnum::customOptions()),
             ];
         }
+        $ttsCapabilities = [
+            CapabilityEnum::textToSpeechConversion(),
+        ];
+        $ttsOptions = [
+            new SupportedOption(OptionEnum::inputModalities(), [[ModalityEnum::text()]]),
+            new SupportedOption(OptionEnum::outputModalities(), [[ModalityEnum::audio()]]),
+            // Gemini TTS returns raw PCM which we wrap into a WAV container.
+            new SupportedOption(OptionEnum::outputMimeType(), ['audio/wav']),
+            new SupportedOption(OptionEnum::outputFileType(), [FileTypeEnum::inline()]),
+            new SupportedOption(OptionEnum::outputSpeechVoice()),
+            new SupportedOption(OptionEnum::customOptions()),
+        ];
 
         $modelsData = (array) $responseData['models'];
 
@@ -226,13 +238,21 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
                     $embeddingCapabilities,
                     $embeddingOptions,
                     $multimodalEmbeddingOptions,
+                    $ttsCapabilities,
+                    $ttsOptions,
                     $gemini31ImageAspectRatios
                 ): ModelMetadata {
                     $modelId = $modelData['baseModelId'] ?? $modelData['name'];
                     if (str_starts_with($modelId, 'models/')) {
                         $modelId = substr($modelId, 7);
                     }
-                    if (
+                    if (str_contains($modelId, '-tts')) {
+                        // TTS models (e.g. gemini-2.5-flash-preview-tts,
+                        // gemini-3.1-flash-tts-preview) also report generateContent,
+                        // so this check must come first.
+                        $modelCaps = $ttsCapabilities;
+                        $modelOptions = $ttsOptions;
+                    } elseif (
                         isset($modelData['supportedGenerationMethods']) &&
                         is_array($modelData['supportedGenerationMethods']) &&
                         in_array('generateContent', $modelData['supportedGenerationMethods'], true)

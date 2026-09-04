@@ -100,9 +100,20 @@ trait WithMessagePartDataTrait
             if ($args !== null) {
                 $functionCallData['args'] = $args;
             }
-            return [
+            $partData = [
                 'functionCall' => $functionCallData,
             ];
+            /*
+             * Thinking models attach a thought signature to every function call part, and the
+             * Google AI API requires it to be sent back unchanged on all following turns of the
+             * same conversation. Without it a multi-turn tool call fails with "Function call is
+             * missing a thought_signature in functionCall parts".
+             */
+            $thoughtSignature = $this->getMessagePartThoughtSignature($part);
+            if ($thoughtSignature !== null) {
+                $partData['thoughtSignature'] = $thoughtSignature;
+            }
+            return $partData;
         }
         if ($type->isFunctionResponse()) {
             $functionResponse = $part->getFunctionResponse();
@@ -133,5 +144,20 @@ trait WithMessagePartDataTrait
                 $type
             )
         );
+    }
+
+    /**
+     * Returns the thought signature of a message part, if it carries one.
+     *
+     * @since n.e.x.t
+     *
+     * @param MessagePart $part The message part to get the thought signature for.
+     * @return string|null The thought signature, or null if there is none.
+     */
+    protected function getMessagePartThoughtSignature(MessagePart $part): ?string
+    {
+        $thoughtSignature = $part->getThoughtSignature();
+
+        return $thoughtSignature !== null && $thoughtSignature !== '' ? $thoughtSignature : null;
     }
 }

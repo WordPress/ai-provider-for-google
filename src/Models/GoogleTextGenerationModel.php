@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WordPress\GoogleAiProvider\Models;
 
+use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
 use WordPress\AiClient\Common\Exception\RuntimeException;
 use WordPress\AiClient\Files\DTO\File;
@@ -46,7 +47,8 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  * @phpstan-type UsageData array{
  *     promptTokenCount?: int,
  *     candidatesTokenCount?: int,
- *     thoughtsTokenCount?: int
+ *     thoughtsTokenCount?: int,
+ *     totalTokenCount?: int
  * }
  * @phpstan-type ResponseData array{
  *     id?: string,
@@ -459,10 +461,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         if (isset($responseData['usageMetadata']) && is_array($responseData['usageMetadata'])) {
             $usage = $responseData['usageMetadata'];
 
+            $promptTokenCount = $usage['promptTokenCount'] ?? 0;
+            $candidatesTokenCount = $usage['candidatesTokenCount'] ?? 0;
+            $thoughtsTokenCount = $usage['thoughtsTokenCount'] ?? 0;
+
+            // Prefer Google's authoritative total when it is available. Older API responses may omit it.
+            $totalTokenCount = $usage['totalTokenCount'] ??
+                ($promptTokenCount + $candidatesTokenCount + $thoughtsTokenCount);
+
             $tokenUsage = new TokenUsage(
-                $usage['promptTokenCount'] ?? 0,
-                $usage['candidatesTokenCount'] ?? 0,
-                ($usage['candidatesTokenCount'] ?? 0) + ($usage['thoughtsTokenCount'] ?? 0)
+                $promptTokenCount,
+                $candidatesTokenCount,
+                $totalTokenCount
             );
         } else {
             $tokenUsage = new TokenUsage(0, 0, 0);
@@ -665,13 +675,22 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (is_array($args) && count($args) === 0) {
                 $args = null;
             }
-            return new MessagePart(
-                new FunctionCall(
-                    null,
-                    $partData['functionCall']['name'],
-                    $args
-                )
+            $functionCall = new FunctionCall(
+                null,
+                $partData['functionCall']['name'],
+                $args
             );
+            /*
+             * The thought signature of a function call must be preserved so that it can be sent
+             * back with the conversation history on subsequent turns. See getMessagePartData().
+             */
+            $thoughtSignature = isset($partData['thoughtSignature']) && is_string($partData['thoughtSignature'])
+                ? $partData['thoughtSignature']
+                : null;
+            if ($thoughtSignature !== null) {
+                return new MessagePart($functionCall, null, $thoughtSignature);
+            }
+            return new MessagePart($functionCall);
         }
         throw new InvalidArgumentException('Part has an unexpected type.');
     }
