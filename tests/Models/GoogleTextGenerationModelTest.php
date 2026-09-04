@@ -12,6 +12,7 @@ use WordPress\AiClient\Providers\Http\DTO\Response;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
 use WordPress\AiClient\Providers\Models\Enums\CapabilityEnum;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
+use WordPress\AiClient\Tools\DTO\FunctionDeclaration;
 use WordPress\GoogleAiProvider\Models\GoogleTextGenerationModel;
 
 /**
@@ -21,6 +22,72 @@ use WordPress\GoogleAiProvider\Models\GoogleTextGenerationModel;
  */
 class GoogleTextGenerationModelTest extends TestCase
 {
+    /**
+     * Tests that function parameters are forwarded as standard JSON Schema.
+     *
+     * @since n.e.x.t
+     */
+    public function testFunctionParametersUseJsonSchemaField(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'value' => [
+                    'type' => ['string', 'array'],
+                    'items' => ['type' => 'integer'],
+                ],
+                'metadata' => [
+                    'type' => 'object',
+                    'additionalProperties' => true,
+                ],
+                'priorities' => [
+                    'type' => 'array',
+                    'uniqueItems' => true,
+                    'items' => [
+                        'type' => 'integer',
+                        'enum' => [1, 2],
+                    ],
+                ],
+            ],
+            'required' => ['value'],
+        ];
+        $model = new class (
+            new ModelMetadata('gemini-test', 'Gemini test', [CapabilityEnum::textGeneration()], []),
+            new ProviderMetadata('google', 'Google', ProviderTypeEnum::cloud())
+        ) extends GoogleTextGenerationModel {
+            /**
+             * Prepares function declarations for a Google request.
+             *
+             * @param list<FunctionDeclaration> $declarations Function declarations.
+             * @return list<array<string, mixed>> Prepared declarations.
+             */
+            public function prepareFunctionDeclarations(array $declarations): array
+            {
+                return $this->prepareFunctionDeclarationsParam($declarations);
+            }
+        };
+
+        $prepared = $model->prepareFunctionDeclarations([
+            new FunctionDeclaration('complex_tool', 'Accepts a complex schema.', $schema),
+            new FunctionDeclaration('parameterless_tool', 'Accepts no parameters.'),
+        ]);
+
+        $this->assertSame(
+            [
+                [
+                    'name' => 'complex_tool',
+                    'description' => 'Accepts a complex schema.',
+                    'parametersJsonSchema' => $schema,
+                ],
+                [
+                    'name' => 'parameterless_tool',
+                    'description' => 'Accepts no parameters.',
+                ],
+            ],
+            $prepared
+        );
+    }
+
     /**
      * Tests that Google's total token count is preserved when supplied.
      *

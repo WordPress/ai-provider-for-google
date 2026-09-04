@@ -523,8 +523,8 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         foreach ($functionDeclarations as $functionDeclaration) {
             $data = $functionDeclaration->toArray();
             if (isset($data['parameters'])) {
-                // The Google AI API does not allow the `additionalProperties` key for function parameters.
-                $data['parameters'] = $this->removeAdditionalPropertiesKey($data['parameters']);
+                $data['parametersJsonSchema'] = $data['parameters'];
+                unset($data['parameters']);
             }
             $preparedFunctionDeclarations[] = $data;
         }
