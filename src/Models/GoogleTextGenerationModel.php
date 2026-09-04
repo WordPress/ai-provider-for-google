@@ -390,6 +390,10 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             $functionCallData = [
                 'name' => $functionCall->getName(),
             ];
+            $functionCallId = $functionCall->getId();
+            if ($functionCallId !== null && $functionCallId !== '') {
+                $functionCallData['id'] = $functionCallId;
+            }
             // Only include args if present; Google's API accepts omitting args for no-argument functions.
             $args = $functionCall->getArgs();
             if ($args !== null) {
@@ -418,19 +422,24 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     'The function_response typed message part must contain a function response.'
                 );
             }
-            return [
-                'functionResponse' => [
-                    'name' => $functionResponse->getName(),
+            $functionResponseData = [
+                'name' => $functionResponse->getName(),
 
-                    /*
-                     * The Google AI API requires function responses to be objects.
-                     * See also https://ai.google.dev/gemini-api/docs/function-calling#multi-turn-example-1
-                     */
-                    'response' => [
-                        'name' => $functionResponse->getName(),
-                        'content' => $functionResponse->getResponse(),
-                    ],
+                /*
+                 * The Google AI API requires function responses to be objects.
+                 * See also https://ai.google.dev/gemini-api/docs/function-calling#multi-turn-example-1
+                 */
+                'response' => [
+                    'name' => $functionResponse->getName(),
+                    'content' => $functionResponse->getResponse(),
                 ],
+            ];
+            $functionResponseId = $functionResponse->getId();
+            if ($functionResponseId !== null && $functionResponseId !== '') {
+                $functionResponseData['id'] = $functionResponseId;
+            }
+            return [
+                'functionResponse' => $functionResponseData,
             ];
         }
         throw new InvalidArgumentException(
@@ -821,7 +830,8 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (
                 !is_array($partData['functionCall']) ||
                 !isset($partData['functionCall']['name']) ||
-                !is_string($partData['functionCall']['name'])
+                !is_string($partData['functionCall']['name']) ||
+                (isset($partData['functionCall']['id']) && !is_string($partData['functionCall']['id']))
             ) {
                 throw new InvalidArgumentException('Part has an invalid functionCall shape.');
             }
@@ -833,8 +843,11 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (is_array($args) && count($args) === 0) {
                 $args = null;
             }
+            $functionCallId = isset($partData['functionCall']['id']) && is_string($partData['functionCall']['id'])
+                ? $partData['functionCall']['id']
+                : null;
             $functionCall = new FunctionCall(
-                null,
+                $functionCallId,
                 $partData['functionCall']['name'],
                 $args
             );
