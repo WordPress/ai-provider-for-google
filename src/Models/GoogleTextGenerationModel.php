@@ -542,13 +542,163 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      */
     protected function removeAdditionalPropertiesKey(array $schema): array
     {
-        if (isset($schema['additionalProperties'])) {
-            unset($schema['additionalProperties']);
+        $supportedSchemaKeys = [
+            'anyOf',
+            'default',
+            'description',
+            'enum',
+            'example',
+            'format',
+            'items',
+            'maximum',
+            'maxItems',
+            'maxLength',
+            'maxProperties',
+            'minimum',
+            'minItems',
+            'minLength',
+            'minProperties',
+            'nullable',
+            'pattern',
+            'properties',
+            'propertyOrdering',
+            'required',
+            'title',
+            'type',
+        ];
+        $typeSpecificSchemaKeys = [
+            'array' => ['items', 'maxItems', 'minItems'],
+            'integer' => ['format', 'maximum', 'minimum'],
+            'number' => ['format', 'maximum', 'minimum'],
+            'object' => ['maxProperties', 'minProperties', 'properties', 'propertyOrdering', 'required'],
+            'string' => ['enum', 'format', 'maxLength', 'minLength', 'pattern'],
+        ];
+
+        /*
+         * Gemini rejects JSON Schema keywords that are not fields of its
+         * generateContent Schema, including additionalProperties and uniqueItems.
+         */
+        foreach (array_keys($schema) as $key) {
+            if (!in_array($key, $supportedSchemaKeys, true)) {
+                unset($schema[$key]);
+            }
+        }
+        if (isset($schema['type']) && is_array($schema['type'])) {
+            /*
+             * Gemini's Schema accepts a scalar `type`, but supports unions through
+             * `anyOf`. Preserve every declared type instead of narrowing the schema
+             * to its first non-null member.
+             *
+             * A simple `T|null` union uses Gemini's `nullable` field for compatibility.
+             *
+             * @see https://ai.google.dev/api/generate-content#Schema
+             */
+            $types = [];
+            foreach ($schema['type'] as $type) {
+                if (!is_string($type)) {
+                    throw new InvalidArgumentException(
+                        'Schema type unions must contain only string values.'
+                    );
+                }
+                $types[] = $type;
+            }
+
+            $types = array_values(array_unique($types));
+            if ($types === []) {
+                throw new InvalidArgumentException(
+                    'Schema type unions must contain at least one type.'
+                );
+            }
+
+            $nonNullTypes = array_values(
+                array_filter(
+                    $types,
+                    static function (string $type): bool {
+                        return $type !== 'null';
+                    }
+                )
+            );
+            $hasNull = count($types) !== count($nonNullTypes);
+
+            if (count($nonNullTypes) === 1) {
+                $schema['type'] = $nonNullTypes[0];
+
+                if ($hasNull) {
+                    $schema['nullable'] = true;
+                }
+            } elseif ($nonNullTypes === []) {
+                $schema['type'] = 'null';
+            } else {
+                if (isset($schema['anyOf'])) {
+                    throw new InvalidArgumentException(
+                        'A schema cannot combine an existing anyOf with a type union.'
+                    );
+                }
+
+                unset($schema['type']);
+
+                $typeSpecificKeys = [];
+                foreach ($typeSpecificSchemaKeys as $keys) {
+                    foreach ($keys as $key) {
+                        $typeSpecificKeys[$key] = true;
+                    }
+                }
+
+                $schema['anyOf'] = [];
+                foreach ($nonNullTypes as $type) {
+                    $branch = ['type' => $type];
+                    foreach ($typeSpecificSchemaKeys[$type] ?? [] as $key) {
+                        if (array_key_exists($key, $schema)) {
+                            $branch[$key] = $schema[$key];
+                        }
+                    }
+                    if ($type === 'array' && !array_key_exists('items', $branch)) {
+                        $branch['items'] = new \stdClass();
+                    }
+                    $schema['anyOf'][] = $branch;
+                }
+
+                foreach (array_keys($typeSpecificKeys) as $key) {
+                    unset($schema[$key]);
+                }
+
+                if ($hasNull) {
+                    $schema['anyOf'][] = ['type' => 'null'];
+                }
+            }
+        }
+        if (array_key_exists('enum', $schema)) {
+            /*
+             * Gemini defines enum as string[] for STRING values. Numeric and other
+             * JSON Schema enum values cannot be represented by this field, so remove
+             * the constraint rather than sending invalid data or changing its type.
+             *
+             * @see https://ai.google.dev/api/generate-content#Schema
+             */
+            $hasOnlyStringValues = is_array($schema['enum']);
+            if ($hasOnlyStringValues) {
+                foreach ($schema['enum'] as $enumValue) {
+                    if (!is_string($enumValue)) {
+                        $hasOnlyStringValues = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!$hasOnlyStringValues || ($schema['type'] ?? null) !== 'string') {
+                unset($schema['enum']);
+            }
         }
         if (isset($schema['properties']) && is_array($schema['properties'])) {
-            /** @var array<string, mixed> $childSchema */
-            foreach ($schema['properties'] as $key => $childSchema) {
-                $schema['properties'][$key] = $this->removeAdditionalPropertiesKey($childSchema);
+            if (count($schema['properties']) === 0) {
+                $schema['properties'] = new \stdClass();
+            } else {
+                /** @var array<string, mixed> $childSchema */
+                foreach ($schema['properties'] as $key => $childSchema) {
+                    if (is_array($childSchema)) {
+                        $schema['properties'][$key] = $this->removeAdditionalPropertiesKey($childSchema);
+                    }
+                }
             }
         }
         if (isset($schema['items']) && is_array($schema['items'])) {
@@ -563,6 +713,33 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 /** @var array<string, mixed> $items */
                 $items = $schema['items'];
                 $schema['items'] = $this->removeAdditionalPropertiesKey($items);
+            }
+        }
+        if (isset($schema['anyOf'])) {
+            /*
+             * Gemini defines every `anyOf` member as another Schema. Recursively
+             * normalize those members so nested type unions, empty properties maps,
+             * and unsupported additionalProperties fields do not reach the API.
+             *
+             * @see https://ai.google.dev/api/generate-content#Schema
+             */
+            if (!is_array($schema['anyOf']) || !array_is_list($schema['anyOf'])) {
+                throw new InvalidArgumentException(
+                    'The schema anyOf field must be a list of schemas.'
+                );
+            }
+
+            foreach ($schema['anyOf'] as $key => $childSchema) {
+                if (!is_array($childSchema)) {
+                    throw new InvalidArgumentException(
+                        'Every schema anyOf member must be an object.'
+                    );
+                }
+
+                /** @var array<string, mixed> $childSchema */
+                $schema['anyOf'][$key] = $this->removeAdditionalPropertiesKey(
+                    $childSchema
+                );
             }
         }
         return $schema;
