@@ -58,6 +58,7 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface
 {
     use WithAspectRatioTrait;
+    use WithMessagePartDataTrait;
 
     /**
      * {@inheritDoc}
@@ -851,20 +852,5 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             return new MessagePart($functionCall);
         }
         throw new InvalidArgumentException('Part has an unexpected type.');
-    }
-
-    /**
-     * Returns the thought signature of a message part, if it carries one.
-     *
-     * @since n.e.x.t
-     *
-     * @param MessagePart $part The message part to get the thought signature for.
-     * @return string|null The thought signature, or null if there is none.
-     */
-    protected function getMessagePartThoughtSignature(MessagePart $part): ?string
-    {
-        $thoughtSignature = $part->getThoughtSignature();
-
-        return $thoughtSignature !== null && $thoughtSignature !== '' ? $thoughtSignature : null;
     }
 }
