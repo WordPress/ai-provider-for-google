@@ -3,7 +3,7 @@
 /**
  * PHPUnit bootstrap file for the AI Provider for Google package.
  *
- * @since n.e.x.t
+ * @since 1.2.0
  *
  * @package WordPress\GoogleAiProvider
  */
