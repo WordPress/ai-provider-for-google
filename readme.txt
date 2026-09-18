@@ -48,6 +48,23 @@ No, this plugin requires the PHP AI Client plugin to be installed and activated.
 
 == Changelog ==
 
+= 1.2.0 - 2026-09-21 =
+
+**Added**
+
+* Support for text to speech conversion ([#31](https://github.com/WordPress/ai-provider-for-google/pull/31)).
+* WordPress Playground preview blueprint that installs and activates the AI plugin and Google provider, enables AI and image generation/editing settings, logs in automatically, opens the Connectors screen, and configures Playground networking for provider requests after credentials are set ([#43](https://github.com/WordPress/ai-provider-for-google/pull/43)).
+
+**Changed**
+
+* Updated the supported development baseline to PHP AI Client 1.3.1 and added automated compatibility testing across PHP 7.4–8.4 with the lowest and latest supported dependencies ([#40](https://github.com/WordPress/ai-provider-for-google/pull/40)).
+
+**Fixed**
+
+* Google thought signature round-tripping and thought token usage compatibility for tool-calling requests ([#26](https://github.com/WordPress/ai-provider-for-google/pull/26)).
+* Gemini tool-calling by preserving `thoughtSignature` values across turns so function calls remain valid in multi-step conversations ([#36](https://github.com/WordPress/ai-provider-for-google/pull/36)).
+* Gemini usage parsing to use Google’s authoritative `totalTokenCount` when available, ensuring prompt tokens are included in reported totals while keeping a backward-compatible fallback for older responses ([#44](https://github.com/WordPress/ai-provider-for-google/pull/44)).
+
 = 1.1.1 - 2026-08-17 =
 
 **Changed**
