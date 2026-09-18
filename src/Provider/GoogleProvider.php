@@ -19,6 +19,7 @@ use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
 use WordPress\GoogleAiProvider\Models\GoogleImageGenerationModel;
 use WordPress\GoogleAiProvider\Models\GoogleTextAndImageGenerationModel;
 use WordPress\GoogleAiProvider\Models\GoogleTextGenerationModel;
+use WordPress\GoogleAiProvider\Models\GoogleTextToSpeechConversionModel;
 
 /**
  * Class for the Google provider.
@@ -57,6 +58,9 @@ class GoogleProvider extends AbstractApiProvider
 
         $capabilities = $modelMetadata->getSupportedCapabilities();
         foreach ($capabilities as $capability) {
+            if ($capability->isTextToSpeechConversion()) {
+                return new GoogleTextToSpeechConversionModel($modelMetadata, $providerMetadata);
+            }
             if ($capability->isTextGeneration()) {
                 return new GoogleTextGenerationModel($modelMetadata, $providerMetadata);
             }
@@ -89,9 +93,9 @@ class GoogleProvider extends AbstractApiProvider
             // For WordPress, we should translate the description.
             if (function_exists('__')) {
                 // phpcs:ignore Generic.Files.LineLength.TooLong
-                $providerMetadataArgs[] = __('Text and image generation with Gemini and Imagen.', 'ai-provider-for-google');
+                $providerMetadataArgs[] = __('Text, image, and speech generation with Gemini and Imagen.', 'ai-provider-for-google');
             } else {
-                $providerMetadataArgs[] = 'Text and image generation with Gemini and Imagen.';
+                $providerMetadataArgs[] = 'Text, image, and speech generation with Gemini and Imagen.';
             }
         }
         // Provider logoPath support was added in 1.3.0.

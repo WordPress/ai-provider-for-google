@@ -46,7 +46,8 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  * @phpstan-type UsageData array{
  *     promptTokenCount?: int,
  *     candidatesTokenCount?: int,
- *     thoughtsTokenCount?: int
+ *     thoughtsTokenCount?: int,
+ *     totalTokenCount?: int
  * }
  * @phpstan-type ResponseData array{
  *     id?: string,
@@ -323,14 +324,14 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $type = $part->getType();
         if ($type->isText()) {
             if ($part->getChannel()->isThought()) {
-                return [
+                return $this->addThoughtSignatureToPartData([
                     'text'    => $part->getText(),
                     'thought' => true,
-                ];
+                ], $part);
             }
-            return [
+            return $this->addThoughtSignatureToPartData([
                 'text' => $part->getText(),
-            ];
+            ], $part);
         }
         if ($type->isFile()) {
             $file = $part->getFile();
@@ -350,18 +351,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 }
                 // Special case for YouTube video URLs.
                 if (preg_match('/^https?:\/\/(?:www\.)?(?:m\.)?(?:youtu\.be\/|youtube\.com\/)/', $fileUrl)) {
-                    return [
+                    return $this->addThoughtSignatureToPartData([
                         'fileData' => [
                             'fileUri' => $fileUrl,
                         ],
-                    ];
+                    ], $part);
                 }
-                return [
+                return $this->addThoughtSignatureToPartData([
                     'fileData' => [
                         'mimeType' => $file->getMimeType(),
                         'fileUri' => $fileUrl,
                     ],
-                ];
+                ], $part);
             }
             // Else, it is an inline file.
             $fileBase64Data = $file->getBase64Data();
@@ -371,12 +372,12 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     'The inline file must contain base64 data.'
                 );
             }
-            return [
+            return $this->addThoughtSignatureToPartData([
                 'inlineData' => [
                     'mimeType' => $file->getMimeType(),
                     'data' => $fileBase64Data,
                 ],
-            ];
+            ], $part);
         }
         if ($type->isFunctionCall()) {
             $functionCall = $part->getFunctionCall();
@@ -394,9 +395,20 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if ($args !== null) {
                 $functionCallData['args'] = $args;
             }
-            return [
+            $partData = [
                 'functionCall' => $functionCallData,
             ];
+            /*
+             * Thinking models attach a thought signature to every function call part, and the
+             * Google AI API requires it to be sent back unchanged on all following turns of the
+             * same conversation. Without it a multi-turn tool call fails with "Function call is
+             * missing a thought_signature in functionCall parts".
+             */
+            $thoughtSignature = $this->getMessagePartThoughtSignature($part);
+            if ($thoughtSignature !== null) {
+                $partData['thoughtSignature'] = $thoughtSignature;
+            }
+            return $partData;
         }
         if ($type->isFunctionResponse()) {
             $functionResponse = $part->getFunctionResponse();
@@ -427,6 +439,25 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 $type
             )
         );
+    }
+
+    /**
+     * Adds the thought signature to a Google message part when present.
+     *
+     * @since n.e.x.t
+     *
+     * @param array<string, mixed> $partData The Google API part payload.
+     * @param MessagePart          $part     The source message part.
+     * @return array<string, mixed> The part payload, with the thought signature when available.
+     */
+    protected function addThoughtSignatureToPartData(array $partData, MessagePart $part): array
+    {
+        $thoughtSignature = $this->getMessagePartThoughtSignature($part);
+        if ($thoughtSignature !== null) {
+            $partData['thoughtSignature'] = $thoughtSignature;
+        }
+
+        return $partData;
     }
 
     /**
@@ -578,10 +609,20 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         if (isset($responseData['usageMetadata']) && is_array($responseData['usageMetadata'])) {
             $usage = $responseData['usageMetadata'];
 
+            $promptTokenCount = $usage['promptTokenCount'] ?? 0;
+            $candidatesTokenCount = $usage['candidatesTokenCount'] ?? 0;
+            $thoughtsTokenCount = $usage['thoughtsTokenCount'] ?? 0;
+            $completionTokenCount = $candidatesTokenCount + $thoughtsTokenCount;
+
+            // Prefer Google's authoritative total when it is available. Older API responses may omit it.
+            $totalTokenCount = $usage['totalTokenCount'] ??
+                ($promptTokenCount + $completionTokenCount);
+
             $tokenUsage = new TokenUsage(
-                $usage['promptTokenCount'] ?? 0,
-                $usage['candidatesTokenCount'] ?? 0,
-                ($usage['candidatesTokenCount'] ?? 0) + ($usage['thoughtsTokenCount'] ?? 0)
+                $promptTokenCount,
+                $completionTokenCount,
+                $totalTokenCount,
+                $thoughtsTokenCount
             );
         } else {
             $tokenUsage = new TokenUsage(0, 0, 0);
@@ -725,14 +766,18 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      */
     protected function parseResponseCandidateMessagePart(array $partData): MessagePart
     {
+        $thoughtSignature = isset($partData['thoughtSignature']) && is_string($partData['thoughtSignature'])
+            ? $partData['thoughtSignature']
+            : null;
+
         if (isset($partData['text'])) {
             if (!is_string($partData['text'])) {
                 throw new InvalidArgumentException('Part has an invalid text shape.');
             }
             if (isset($partData['thought']) && $partData['thought']) {
-                return new MessagePart($partData['text'], MessagePartChannelEnum::thought());
+                return new MessagePart($partData['text'], MessagePartChannelEnum::thought(), $thoughtSignature);
             }
-            return new MessagePart($partData['text']);
+            return new MessagePart($partData['text'], null, $thoughtSignature);
         }
         if (isset($partData['inlineData'])) {
             if (
@@ -748,7 +793,9 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     isset($partData['inlineData']['mimeType']) && is_string($partData['inlineData']['mimeType']) ?
                         $partData['inlineData']['mimeType'] :
                         null
-                )
+                ),
+                null,
+                $thoughtSignature
             );
         }
         if (isset($partData['fileData'])) {
@@ -765,7 +812,9 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     isset($partData['fileData']['mimeType']) && is_string($partData['fileData']['mimeType']) ?
                         $partData['fileData']['mimeType'] :
                         null
-                )
+                ),
+                null,
+                $thoughtSignature
             );
         }
         if (isset($partData['functionCall'])) {
@@ -784,14 +833,38 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (is_array($args) && count($args) === 0) {
                 $args = null;
             }
-            return new MessagePart(
-                new FunctionCall(
-                    null,
-                    $partData['functionCall']['name'],
-                    $args
-                )
+            $functionCall = new FunctionCall(
+                null,
+                $partData['functionCall']['name'],
+                $args
             );
+            /*
+             * The thought signature of a function call must be preserved so that it can be sent
+             * back with the conversation history on subsequent turns. See getMessagePartData().
+             */
+            $thoughtSignature = isset($partData['thoughtSignature']) && is_string($partData['thoughtSignature'])
+                ? $partData['thoughtSignature']
+                : null;
+            if ($thoughtSignature !== null) {
+                return new MessagePart($functionCall, null, $thoughtSignature);
+            }
+            return new MessagePart($functionCall);
         }
         throw new InvalidArgumentException('Part has an unexpected type.');
+    }
+
+    /**
+     * Returns the thought signature of a message part, if it carries one.
+     *
+     * @since n.e.x.t
+     *
+     * @param MessagePart $part The message part to get the thought signature for.
+     * @return string|null The thought signature, or null if there is none.
+     */
+    protected function getMessagePartThoughtSignature(MessagePart $part): ?string
+    {
+        $thoughtSignature = $part->getThoughtSignature();
+
+        return $thoughtSignature !== null && $thoughtSignature !== '' ? $thoughtSignature : null;
     }
 }
