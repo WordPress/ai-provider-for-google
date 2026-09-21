@@ -62,7 +62,7 @@ echo $result->toText();
 
 ## Supported Models
 
-Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support) and Imagen models for image generation. See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
+Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support), Imagen models for image generation, and Text to Speech generation. See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
 
 ## Configuration
 
