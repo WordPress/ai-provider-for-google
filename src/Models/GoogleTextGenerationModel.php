@@ -444,7 +444,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
     /**
      * Adds the thought signature to a Google message part when present.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param array<string, mixed> $partData The Google API part payload.
      * @param MessagePart          $part     The source message part.
@@ -856,7 +856,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
     /**
      * Returns the thought signature of a message part, if it carries one.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param MessagePart $part The message part to get the thought signature for.
      * @return string|null The thought signature, or null if there is none.

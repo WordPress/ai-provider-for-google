@@ -3,7 +3,7 @@ Contributors:      wordpressdotorg
 Tags:              ai, google, gemini, artificial-intelligence, connector
 Requires at least: 6.9
 Tested up to:      7.1
-Stable tag:        1.1.1
+Stable tag:        1.2.0
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -12,12 +12,13 @@ Google AI (Gemini) provider for the PHP AI Client SDK.
 
 == Description ==
 
-This plugin provides Google AI (Gemini) integration for the PHP AI Client SDK. It enables WordPress sites to use Google's Gemini models for text generation, image generation, and other AI capabilities.
+This plugin provides Google AI (Gemini) integration for the PHP AI Client SDK. It enables WordPress sites to use Google's Gemini models for text generation, image generation, text to speech, and other AI capabilities.
 
 **Features:**
 
 * Text generation with Gemini models
 * Image generation with Imagen models
+* Text to Speech conversion with Gemini models
 * Function calling support
 * Automatic provider registration
 
@@ -47,6 +48,23 @@ Visit the [Google AI Studio](https://aistudio.google.com/) to create an API key 
 No, this plugin requires the PHP AI Client plugin to be installed and activated. It provides the Google-specific implementation that the PHP AI Client uses.
 
 == Changelog ==
+
+= 1.2.0 - 2026-09-21 =
+
+**Added**
+
+* Support for text to speech conversion ([#31](https://github.com/WordPress/ai-provider-for-google/pull/31)).
+* WordPress Playground preview blueprint that installs and activates the AI plugin and Google provider, enables AI and image generation/editing settings, logs in automatically, opens the Connectors screen, and configures Playground networking for provider requests after credentials are set ([#43](https://github.com/WordPress/ai-provider-for-google/pull/43)).
+
+**Changed**
+
+* Updated the supported development baseline to PHP AI Client 1.3.1 and added automated compatibility testing across PHP 7.4–8.4 with the lowest and latest supported dependencies ([#40](https://github.com/WordPress/ai-provider-for-google/pull/40)).
+
+**Fixed**
+
+* Google thought signature round-tripping and thought token usage compatibility for tool-calling requests ([#26](https://github.com/WordPress/ai-provider-for-google/pull/26)).
+* Gemini tool-calling by preserving `thoughtSignature` values across turns so function calls remain valid in multi-step conversations ([#36](https://github.com/WordPress/ai-provider-for-google/pull/36)).
+* Gemini usage parsing to use Google’s authoritative `totalTokenCount` when available, ensuring prompt tokens are included in reported totals while keeping a backward-compatible fallback for older responses ([#44](https://github.com/WordPress/ai-provider-for-google/pull/44)).
 
 = 1.1.1 - 2026-08-17 =
 
