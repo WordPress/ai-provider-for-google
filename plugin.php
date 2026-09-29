@@ -52,3 +52,46 @@ function register_provider(): void
 }
 
 add_action('init', __NAMESPACE__ . '\\register_provider', 5);
+
+/**
+ * Renders an admin notice if the required WordPress AI Client SDK is missing.
+ *
+ * @since 1.1.1
+ *
+ * @return void
+ */
+function render_missing_client_notice(): void
+{
+    if (class_exists(AiClient::class)) {
+        return;
+    }
+
+    if (!function_exists('is_admin') || !is_admin()) {
+        return;
+    }
+
+    if (!function_exists('current_user_can') || !current_user_can('activate_plugins')) {
+        return;
+    }
+
+    $message = function_exists('__')
+        ? __(
+            'AI Provider for Google requires the WordPress AI Client library to be installed and active.',
+            'ai-provider-for-google'
+        )
+        : 'AI Provider for Google requires the WordPress AI Client library to be installed and active.';
+
+    $aria_label = function_exists('__')
+        ? __('Plugin Dependency Warning', 'ai-provider-for-google')
+        : 'Plugin Dependency Warning';
+
+    if (function_exists('esc_attr') && function_exists('esc_html')) {
+        printf(
+            '<div class="notice notice-warning is-dismissible" role="region" aria-label="%1$s"><p>%2$s</p></div>',
+            esc_attr($aria_label),
+            esc_html($message)
+        );
+    }
+}
+
+add_action('admin_notices', __NAMESPACE__ . '\\render_missing_client_notice');
