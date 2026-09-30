@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WordPress\GoogleAiProvider\Models;
 
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
+use WordPress\AiClient\Common\Exception\RuntimeException;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Providers\ApiBasedImplementation\AbstractApiBasedModel;
 use WordPress\AiClient\Providers\Http\Contracts\RequestAuthenticationInterface;
@@ -32,7 +33,15 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  */
 class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements EmbeddingGenerationModelInterface
 {
-    use WithMessagePartDataTrait;
+    use WithFilePartDataTrait;
+
+    /**
+     * The maximum number of inputs the batchEmbedContents endpoint accepts per request.
+     *
+     * @since n.e.x.t
+     * @var int
+     */
+    protected const MAX_BATCH_SIZE = 100;
 
     /**
      * {@inheritDoc}
@@ -64,23 +73,36 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     {
         $httpTransporter = $this->getHttpTransporter();
 
+        // Validate and prepare all inputs up front, so that no request is sent for invalid input.
         $params = $this->prepareGenerateEmbeddingsParams($input);
 
-        $request = new Request(
-            HttpMethodEnum::POST(),
-            GoogleProvider::url("models/{$this->metadata()->getId()}:batchEmbedContents"),
-            ['Content-Type' => 'application/json'],
-            $params,
-            $this->getRequestOptions()
-        );
+        /** @var non-empty-list<array<string, mixed>> $requests */
+        $requests = $params['requests'];
 
-        // Add authentication credentials to the request.
-        $request = $this->getRequestAuthentication()->authenticateRequest($request);
+        /*
+         * The API rejects batches with more than 100 requests, so larger inputs are split
+         * into multiple requests and the results are combined in input order.
+         */
+        $results = [];
+        foreach (array_chunk($requests, self::MAX_BATCH_SIZE) as $requestsChunk) {
+            $request = new Request(
+                HttpMethodEnum::POST(),
+                GoogleProvider::url("models/{$this->metadata()->getId()}:batchEmbedContents"),
+                ['Content-Type' => 'application/json'],
+                ['requests' => $requestsChunk],
+                $this->getRequestOptions()
+            );
 
-        // Send and process the request.
-        $response = $httpTransporter->send($request);
-        ResponseUtil::throwIfNotSuccessful($response);
-        return $this->parseResponseToEmbeddingResult($response);
+            // Add authentication credentials to the request.
+            $request = $this->getRequestAuthentication()->authenticateRequest($request);
+
+            // Send and process the request.
+            $response = $httpTransporter->send($request);
+            ResponseUtil::throwIfNotSuccessful($response);
+            $results[] = $this->parseResponseToEmbeddingResult($response, count($requestsChunk));
+        }
+
+        return $this->combineEmbeddingResults($results);
     }
 
     /**
@@ -142,7 +164,8 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
      * Prepares a single input part into the Google API request part for one embedding input.
      *
      * Text and file parts are both supported. Whether the model actually accepts a given file
-     * modality is determined by the model's declared input modalities, not here.
+     * modality is determined by the model's declared input modalities, not here. Conversation
+     * specific data such as thought markers and thought signatures is not sent.
      *
      * @since n.e.x.t
      *
@@ -173,16 +196,17 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
                     sprintf('Google embedding input at index %d must contain non-empty text.', $index)
                 );
             }
+            return ['text' => $text];
         }
 
-        $partData = $this->getMessagePartData($part);
-        if ($partData === null) {
-            throw new InvalidArgumentException(
-                sprintf('Google embedding input at index %d could not be prepared.', $index)
+        $file = $part->getFile();
+        if (!$file) {
+            // This should be impossible due to class internals, but still needs to be checked.
+            throw new RuntimeException(
+                'The file typed message part must contain a file.'
             );
         }
-
-        return $partData;
+        return $this->getFilePartData($file);
     }
 
     /**
@@ -190,10 +214,11 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
      *
      * @since n.e.x.t
      *
-     * @param Response $response The response from the API endpoint.
+     * @param Response $response      The response from the API endpoint.
+     * @param int      $expectedCount The number of inputs, i.e. the number of embeddings expected.
      * @return EmbeddingResult The parsed embedding result.
      */
-    protected function parseResponseToEmbeddingResult(Response $response): EmbeddingResult
+    protected function parseResponseToEmbeddingResult(Response $response, int $expectedCount): EmbeddingResult
     {
         /** @var ResponseData $responseData */
         $responseData = $response->getData();
@@ -228,6 +253,14 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
             );
         }
 
+        if (count($embeddings) !== $expectedCount) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                'embeddings',
+                sprintf('Expected %d embeddings, but received %d.', $expectedCount, count($embeddings))
+            );
+        }
+
         /*
          * Newer models return usage metadata for embeddings, while older models do not.
          */
@@ -248,6 +281,42 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
             $embeddings,
             count($embeddings[0]->getValues()),
             $tokenUsage,
+            $this->providerMetadata(),
+            $this->metadata(),
+            $additionalData
+        );
+    }
+
+    /**
+     * Combines the results of multiple batch requests into a single embedding result.
+     *
+     * @since n.e.x.t
+     *
+     * @param non-empty-list<EmbeddingResult> $results The results, in input order.
+     * @return EmbeddingResult The combined embedding result.
+     */
+    protected function combineEmbeddingResults(array $results): EmbeddingResult
+    {
+        if (count($results) === 1) {
+            return $results[0];
+        }
+
+        $embeddings = [];
+        $promptTokens = 0;
+        $additionalData = [];
+        foreach ($results as $result) {
+            foreach ($result->getEmbeddings() as $embedding) {
+                $embeddings[] = $embedding;
+            }
+            $promptTokens += $result->getTokenUsage()->getPromptTokens();
+            $additionalData = array_merge($additionalData, $result->getAdditionalData());
+        }
+
+        return new EmbeddingResult(
+            '',
+            $embeddings,
+            $results[0]->getDimensions(),
+            new TokenUsage($promptTokens, 0, $promptTokens),
             $this->providerMetadata(),
             $this->metadata(),
             $additionalData
