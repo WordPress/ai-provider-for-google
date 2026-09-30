@@ -58,6 +58,7 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface
 {
     use WithAspectRatioTrait;
+    use WithFilePartDataTrait;
 
     /**
      * {@inheritDoc}
@@ -341,43 +342,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                     'The file typed message part must contain a file.'
                 );
             }
-            if ($file->isRemote()) {
-                $fileUrl = $file->getUrl();
-                if (!$fileUrl) {
-                    // This should be impossible due to class internals, but still needs to be checked.
-                    throw new RuntimeException(
-                        'The remote file must contain a URL.'
-                    );
-                }
-                // Special case for YouTube video URLs.
-                if (preg_match('/^https?:\/\/(?:www\.)?(?:m\.)?(?:youtu\.be\/|youtube\.com\/)/', $fileUrl)) {
-                    return $this->addThoughtSignatureToPartData([
-                        'fileData' => [
-                            'fileUri' => $fileUrl,
-                        ],
-                    ], $part);
-                }
-                return $this->addThoughtSignatureToPartData([
-                    'fileData' => [
-                        'mimeType' => $file->getMimeType(),
-                        'fileUri' => $fileUrl,
-                    ],
-                ], $part);
-            }
-            // Else, it is an inline file.
-            $fileBase64Data = $file->getBase64Data();
-            if (!$fileBase64Data) {
-                // This should be impossible due to class internals, but still needs to be checked.
-                throw new RuntimeException(
-                    'The inline file must contain base64 data.'
-                );
-            }
-            return $this->addThoughtSignatureToPartData([
-                'inlineData' => [
-                    'mimeType' => $file->getMimeType(),
-                    'data' => $fileBase64Data,
-                ],
-            ], $part);
+            return $this->addThoughtSignatureToPartData($this->getFilePartData($file), $part);
         }
         if ($type->isFunctionCall()) {
             $functionCall = $part->getFunctionCall();
