@@ -33,7 +33,7 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
  * Gemini returns raw PCM audio, which this class wraps into a WAV container so the
  * result is a usable, inline `audio/wav` file.
  *
- * @since n.e.x.t
+ * @since 1.2.0
  *
  * @phpstan-type InlineData array{data?: string, mimeType?: string}
  * @phpstan-type PartData array{inlineData?: InlineData}
@@ -69,7 +69,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
      * Since we call the Google API, the API key must be wrapped in the Google
      * specific authentication class.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function getRequestAuthentication(): RequestAuthenticationInterface
     {
@@ -83,7 +83,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function convertTextToSpeechResult(array $prompt): GenerativeAiResult
     {
@@ -112,7 +112,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Prepares the request parameters for the Gemini generateContent endpoint.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param list<Message> $prompt The prompt messages containing the text.
      * @return array<string, mixed> The parameters for the API request.
@@ -180,7 +180,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Extracts the plain text to synthesize from the prompt.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param list<Message> $prompt The prompt messages.
      * @return string The text to convert to speech.
@@ -210,7 +210,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Resolves the voice to use, falling back to the default.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @return string The prebuilt voice name.
      */
@@ -224,7 +224,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Parses the response, wrapping the returned PCM audio into a WAV file.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param Response $response The HTTP response.
      * @return GenerativeAiResult The generative AI result containing the audio file.
@@ -268,7 +268,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Extracts the inline audio data (base64 + MIME) from the response.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param ResponseData|null $data The decoded response data.
      * @return InlineAudioData The inline audio data.
@@ -312,7 +312,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
      *
      * Example input: "audio/L16;codec=pcm;rate=24000".
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param string $mimeType The Gemini inline audio MIME type.
      * @return int The sample rate in Hz.
@@ -329,7 +329,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Wraps raw signed 16-bit little-endian PCM data in a WAV container.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param string $pcm           The raw PCM audio bytes.
      * @param int    $sampleRate    The sample rate in Hz.
@@ -367,7 +367,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Parses token usage from the response, defaulting to zeros.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @param ResponseData|null $data The decoded response data.
      * @return TokenUsage The token usage.
@@ -391,7 +391,7 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
     /**
      * Generates a result identifier (the endpoint does not return one for audio).
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      *
      * @return string The result identifier.
      */

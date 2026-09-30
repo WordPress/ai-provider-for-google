@@ -13,14 +13,14 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 /**
  * Tests for the Google provider.
  *
- * @since n.e.x.t
+ * @since 1.2.0
  */
 class GoogleProviderTest extends TestCase
 {
     /**
      * Tests provider availability against the WordPress 7.0 PHP AI Client baseline.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function testProviderAvailabilitySupportsPhpAiClient131(): void
     {

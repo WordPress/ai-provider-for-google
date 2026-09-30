@@ -18,14 +18,14 @@ use WordPress\GoogleAiProvider\Models\GoogleTextGenerationModel;
 /**
  * Tests for the Google text generation model.
  *
- * @since n.e.x.t
+ * @since 1.2.0
  */
 class GoogleTextGenerationModelTest extends TestCase
 {
     /**
      * Tests that Google's total token count is preserved when supplied.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function testTokenUsageUsesGoogleTotalTokenCount(): void
     {
@@ -57,7 +57,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests the backward-compatible total-token fallback for older responses.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function testTokenUsageFallsBackWhenGoogleTotalTokenCountIsMissing(): void
     {
@@ -87,7 +87,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that thought signatures on text parts survive a response and request round trip.
      *
-     * @since n.e.x.t
+     * @since 1.2.0
      */
     public function testTextPartThoughtSignatureRoundTrip(): void
     {

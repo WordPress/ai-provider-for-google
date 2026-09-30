@@ -144,7 +144,7 @@ A few Google-specific notes:
 
 ## Supported Models
 
-Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support), Imagen models for image generation, and embedding models (such as `gemini-embedding-2` for multimodal embeddings and `gemini-embedding-001` for text-only embeddings). See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
+Available models are dynamically discovered from the Google AI API. This includes Gemini models for text generation (with multimodal input support), Imagen models for image generation, embedding models (such as `gemini-embedding-2` for multimodal embeddings and `gemini-embedding-001` for text-only embeddings), and Text to Speech generation. See the [Google AI documentation](https://ai.google.dev/gemini-api/docs/models) for the full list of available models.
 
 ## Configuration
 
