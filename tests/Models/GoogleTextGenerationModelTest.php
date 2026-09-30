@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WordPress\GoogleAiProvider\Tests\Models;
 
 use PHPUnit\Framework\TestCase;
+use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Providers\DTO\ProviderMetadata;
 use WordPress\AiClient\Providers\Enums\ProviderTypeEnum;
@@ -141,6 +142,53 @@ class GoogleTextGenerationModelTest extends TestCase
                 'thoughtSignature' => 'sig-123',
             ],
             $model->preparePart($part)
+        );
+    }
+
+    /**
+     * Tests that file parts keep their thought signature when sent back to the API.
+     *
+     * @since n.e.x.t
+     */
+    public function testFilePartThoughtSignatureIsSentBack(): void
+    {
+        $model = new class (
+            new ModelMetadata('gemini-test', 'Gemini test', [CapabilityEnum::textGeneration()], []),
+            new ProviderMetadata('google', 'Google', ProviderTypeEnum::cloud())
+        ) extends GoogleTextGenerationModel {
+            /**
+             * Prepares a message part for a Google request.
+             *
+             * @param MessagePart $part Message part.
+             * @return array<string, mixed> Prepared part data.
+             */
+            public function preparePart(MessagePart $part): array
+            {
+                return $this->getMessagePartData($part) ?? [];
+            }
+        };
+
+        $this->assertSame(
+            [
+                'inlineData' => [
+                    'mimeType' => 'image/png',
+                    'data' => 'iVBORw0KGgo=',
+                ],
+                'thoughtSignature' => 'sig-inline',
+            ],
+            $model->preparePart(new MessagePart(new File('data:image/png;base64,iVBORw0KGgo='), null, 'sig-inline'))
+        );
+        $this->assertSame(
+            [
+                'fileData' => [
+                    'mimeType' => 'image/jpeg',
+                    'fileUri' => 'https://example.com/photo.jpg',
+                ],
+                'thoughtSignature' => 'sig-remote',
+            ],
+            $model->preparePart(
+                new MessagePart(new File('https://example.com/photo.jpg', 'image/jpeg'), null, 'sig-remote')
+            )
         );
     }
 

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
 use WordPress\AiClient\Files\DTO\File;
 use WordPress\AiClient\Messages\DTO\MessagePart;
+use WordPress\AiClient\Messages\Enums\MessagePartChannelEnum;
 use WordPress\AiClient\Providers\DTO\ProviderMetadata;
 use WordPress\AiClient\Providers\Enums\ProviderTypeEnum;
 use WordPress\AiClient\Providers\Http\Contracts\HttpTransporterInterface;
@@ -353,6 +354,152 @@ class GoogleEmbeddingGenerationModelTest extends TestCase
 
         $this->expectException(ResponseException::class);
         $model->generateEmbeddingResult([new MessagePart('Search text')]);
+    }
+
+    /**
+     * @dataProvider mismatchedEmbeddingCounts
+     *
+     * @param int $inputCount     The number of inputs sent.
+     * @param int $embeddingCount The number of embeddings returned.
+     */
+    public function testGenerateEmbeddingResultThrowsWhenEmbeddingCountMismatchesInputs(
+        int $inputCount,
+        int $embeddingCount
+    ): void {
+        $model = $this->createModelWithResponses([$this->createEmbeddingsResponse($embeddingCount)]);
+
+        $this->expectException(ResponseException::class);
+        $this->expectExceptionMessage(
+            sprintf('Expected %d embeddings, but received %d.', $inputCount, $embeddingCount)
+        );
+        $model->generateEmbeddingResult($this->createTextInputs($inputCount));
+    }
+
+    /**
+     * @return array<string, array{0: int, 1: int}>
+     */
+    public function mismatchedEmbeddingCounts(): array
+    {
+        return [
+            'fewer embeddings than inputs' => [2, 1],
+            'more embeddings than inputs' => [2, 3],
+        ];
+    }
+
+    public function testGenerateEmbeddingResultSplitsLargeInputIntoBatchesOfOneHundred(): void
+    {
+        $model = new GoogleEmbeddingGenerationModel(
+            $this->createModelMetadata(),
+            $this->createProviderMetadata()
+        );
+        $httpTransporter = $this->createMock(HttpTransporterInterface::class);
+        $requestAuthentication = $this->createMock(RequestAuthenticationInterface::class);
+
+        $requestAuthentication->method('authenticateRequest')->willReturnArgument(0);
+
+        $sentBatchSizes = [];
+        $httpTransporter
+            ->expects($this->exactly(3))
+            ->method('send')
+            ->willReturnCallback(function ($request) use (&$sentBatchSizes): Response {
+                $requests = $request->getData()['requests'];
+                $sentBatchSizes[] = count($requests);
+                return $this->createEmbeddingsResponse(count($requests), 2, count($sentBatchSizes));
+            });
+
+        $model->setHttpTransporter($httpTransporter);
+        $model->setRequestAuthentication($requestAuthentication);
+
+        $result = $model->generateEmbeddingResult($this->createTextInputs(250));
+
+        $this->assertEquals([100, 100, 50], $sentBatchSizes);
+        $embeddings = $result->getEmbeddings();
+        $this->assertCount(250, $embeddings);
+        $this->assertEquals([1, 0], $embeddings[0]->getValues());
+        $this->assertEquals([2, 0], $embeddings[100]->getValues());
+        $this->assertEquals([3, 49], $embeddings[249]->getValues());
+        $this->assertEquals(2, $result->getDimensions());
+        $this->assertEquals(6, $result->getTokenUsage()->getPromptTokens());
+        $this->assertEquals(6, $result->getTokenUsage()->getTotalTokens());
+    }
+
+    public function testPrepareParamsOmitsThoughtMarkersAndSignatures(): void
+    {
+        $model = $this->createExposedModel();
+
+        $params = $model->exposePrepareGenerateEmbeddingsParams([
+            new MessagePart('Thought text', MessagePartChannelEnum::thought(), 'sig-text'),
+            new MessagePart(new File('https://example.com/photo.jpg', 'image/jpeg'), null, 'sig-file'),
+        ]);
+
+        $this->assertEquals(['text' => 'Thought text'], $params['requests'][0]['content']['parts'][0]);
+        $this->assertEquals(
+            ['fileData' => ['mimeType' => 'image/jpeg', 'fileUri' => 'https://example.com/photo.jpg']],
+            $params['requests'][1]['content']['parts'][0]
+        );
+    }
+
+    /**
+     * Creates a model whose transporter returns the given responses in order.
+     *
+     * @param list<Response> $responses The responses to return.
+     * @return GoogleEmbeddingGenerationModel The model.
+     */
+    private function createModelWithResponses(array $responses): GoogleEmbeddingGenerationModel
+    {
+        $model = new GoogleEmbeddingGenerationModel(
+            $this->createModelMetadata(),
+            $this->createProviderMetadata()
+        );
+        $httpTransporter = $this->createMock(HttpTransporterInterface::class);
+        $requestAuthentication = $this->createMock(RequestAuthenticationInterface::class);
+
+        $requestAuthentication->method('authenticateRequest')->willReturnArgument(0);
+        $httpTransporter->method('send')->willReturnOnConsecutiveCalls(...$responses);
+
+        $model->setHttpTransporter($httpTransporter);
+        $model->setRequestAuthentication($requestAuthentication);
+
+        return $model;
+    }
+
+    /**
+     * Creates a response with the given number of embeddings.
+     *
+     * Each embedding is `[$batch, $index]`, so that its origin can be asserted.
+     *
+     * @param int $count        The number of embeddings.
+     * @param int $promptTokens The prompt token count to report.
+     * @param int $batch        The batch number to encode in the embedding values.
+     * @return Response The response.
+     */
+    private function createEmbeddingsResponse(int $count, int $promptTokens = 0, int $batch = 1): Response
+    {
+        $embeddings = [];
+        for ($i = 0; $i < $count; $i++) {
+            $embeddings[] = ['values' => [$batch, $i]];
+        }
+
+        return new Response(200, [], json_encode([
+            'embeddings' => $embeddings,
+            'usageMetadata' => ['promptTokenCount' => $promptTokens],
+        ]));
+    }
+
+    /**
+     * Creates the given number of text inputs.
+     *
+     * @param int $count The number of inputs.
+     * @return list<MessagePart> The inputs.
+     */
+    private function createTextInputs(int $count): array
+    {
+        $inputs = [];
+        for ($i = 0; $i < $count; $i++) {
+            $inputs[] = new MessagePart('Input ' . $i);
+        }
+
+        return $inputs;
     }
 
     /**
