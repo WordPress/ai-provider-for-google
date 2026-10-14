@@ -416,7 +416,7 @@ Third line of speech.",
         $this->assertIsString($wavBytes);
         $this->assertStringStartsWith('RIFF', $wavBytes);
         $this->assertStringContainsString('WAVEfmt ', $wavBytes);
-        $this->assertStringContainsString('data', $wavBytes);
+        $this->assertSame('data', substr($wavBytes, 36, 4));
         $this->assertStringEndsWith($rawPcm, $wavBytes);
 
         $tokenUsage = $result->getTokenUsage();
