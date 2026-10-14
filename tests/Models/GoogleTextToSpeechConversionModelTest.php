@@ -483,6 +483,7 @@ Third line of speech.",
                             [
                                 'inlineData' => [
                                     'data' => $base64Data,
+                                    'mimeType' => 'audio/L16;codec=pcm',
                                 ],
                             ],
                         ],
