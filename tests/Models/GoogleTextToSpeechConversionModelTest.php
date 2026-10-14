@@ -25,7 +25,7 @@ use WordPress\GoogleAiProvider\Models\GoogleTextToSpeechConversionModel;
 /**
  * Tests for the Google text-to-speech conversion model.
  *
- * @since 1.2.0
+ * @since n.e.x.t
  */
 class GoogleTextToSpeechConversionModelTest extends TestCase
 {
