@@ -321,7 +321,8 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
         $prompt = [
             new Message(MessageRoleEnum::user(), [
                 new MessagePart('First line of speech.'),
-                new MessagePart('Second line of speech.'),
+                new MessagePart('First line of speech.'),
+                new MessagePart(new File(base64_encode('png-bytes'), 'image/png')),
             ]),
             new Message(MessageRoleEnum::user(), [
                 new MessagePart('Third line of speech.'),
