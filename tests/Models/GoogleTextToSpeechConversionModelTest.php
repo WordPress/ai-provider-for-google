@@ -33,7 +33,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Prepares convert parameters through the model's protected parameter builder.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      *
      * @param list<Message> $prompt The prompt messages.
      * @param ModelConfig|null $config Optional model configuration.
@@ -72,7 +72,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Prepares prompt text through the model's protected text extractor.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      *
      * @param list<Message> $prompt The prompt messages.
      * @return string Extracted prompt text.
@@ -106,7 +106,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Parses a response through the model's protected response parser.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      *
      * @param array<string, mixed> $data Response data.
      * @return GenerativeAiResult Parsed result.
@@ -140,7 +140,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Wraps raw PCM data in a WAV container through the model's protected method.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      *
      * @param string $pcm The raw PCM bytes.
      * @param int $sampleRate The sample rate in Hz.
@@ -188,7 +188,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that prepareConvertParams defaults to Kore voice and AUDIO modality.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPrepareConvertParamsWithDefaultVoice(): void
     {
@@ -225,7 +225,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that prepareConvertParams uses configured voice when specified.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPrepareConvertParamsWithConfiguredVoice(): void
     {
@@ -245,7 +245,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that prepareConvertParams properly merges custom options.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPrepareConvertParamsWithCustomOptions(): void
     {
@@ -268,7 +268,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that prepareConvertParams throws exception on generationConfig custom option conflict.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPrepareConvertParamsThrowsOnGenerationConfigConflict(): void
     {
@@ -292,7 +292,7 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that prepareConvertParams throws exception on top-level custom option conflict.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPrepareConvertParamsThrowsOnTopLevelConflict(): void
     {
@@ -314,15 +314,15 @@ class GoogleTextToSpeechConversionModelTest extends TestCase
     /**
      * Tests that preparePromptText concatenates text across multiple messages and parts.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPreparePromptTextConcatenatesMultipleMessageParts(): void
     {
         $prompt = [
             new Message(MessageRoleEnum::user(), [
                 new MessagePart('First line of speech.'),
-                new MessagePart('First line of speech.'),
                 new MessagePart(new File(base64_encode('png-bytes'), 'image/png')),
+                new MessagePart('Second line of speech.'),
             ]),
             new Message(MessageRoleEnum::user(), [
                 new MessagePart('Third line of speech.'),
@@ -342,7 +342,7 @@ Third line of speech.",
     /**
      * Tests that preparePromptText throws when prompt has no text.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testPreparePromptTextThrowsWhenEmpty(): void
     {
@@ -361,7 +361,7 @@ Third line of speech.",
     /**
      * Tests response parsing into a GenerativeAiResult with audio WAV file and token usage.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseToGenerativeAiResult(): void
     {
@@ -428,7 +428,7 @@ Third line of speech.",
     /**
      * Tests response parsing extracts sample rate from mimeType correctly.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseWithCustomSampleRate(): void
     {
@@ -468,7 +468,7 @@ Third line of speech.",
     /**
      * Tests response parsing falls back to default 24000 Hz when mimeType is missing rate parameter.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseWithDefaultSampleRateFallback(): void
     {
@@ -508,7 +508,7 @@ Third line of speech.",
     /**
      * Tests response parsing throws when candidates parts array is missing.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseThrowsWhenCandidatesPartsMissing(): void
     {
@@ -529,7 +529,7 @@ Third line of speech.",
     /**
      * Tests response parsing throws when inlineData is missing in parts.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseThrowsWhenInlineDataMissing(): void
     {
@@ -554,7 +554,7 @@ Third line of speech.",
     /**
      * Tests response parsing throws when inline audio data cannot be base64-decoded.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testParseResponseThrowsWhenAudioDataInvalidBase64(): void
     {
@@ -584,7 +584,7 @@ Third line of speech.",
     /**
      * Tests wrapPcmInWav outputs standard 44-byte RIFF/WAVE header and PCM data payload.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testWrapPcmInWavStructure(): void
     {
@@ -624,7 +624,7 @@ Third line of speech.",
     /**
      * Tests that getRequestAuthentication wraps ApiKeyRequestAuthentication in GoogleApiKeyRequestAuthentication.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testGetRequestAuthenticationWrapsApiKey(): void
     {
@@ -648,7 +648,7 @@ Third line of speech.",
     /**
      * Tests that getRequestAuthentication preserves non-ApiKey request authentication.
      *
-     * @since 1.2.0
+     * @since n.e.x.t
      */
     public function testGetRequestAuthenticationPreservesNonApiKeyAuthentication(): void
     {
