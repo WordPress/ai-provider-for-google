@@ -347,7 +347,9 @@ Third line of speech.",
     public function testPreparePromptTextThrowsWhenEmpty(): void
     {
         $prompt = [
-            new Message(MessageRoleEnum::user(), []),
+            new Message(MessageRoleEnum::user(), [
+                new MessagePart(new File(base64_encode('png-bytes'), 'image/png')),
+            ]),
         ];
 
         $this->expectException(InvalidArgumentException::class);
