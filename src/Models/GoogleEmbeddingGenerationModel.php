@@ -1,0 +1,325 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WordPress\GoogleAiProvider\Models;
+
+use WordPress\AiClient\Common\Exception\InvalidArgumentException;
+use WordPress\AiClient\Common\Exception\RuntimeException;
+use WordPress\AiClient\Messages\DTO\MessagePart;
+use WordPress\AiClient\Providers\ApiBasedImplementation\AbstractApiBasedModel;
+use WordPress\AiClient\Providers\Http\Contracts\RequestAuthenticationInterface;
+use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
+use WordPress\AiClient\Providers\Http\DTO\Request;
+use WordPress\AiClient\Providers\Http\DTO\Response;
+use WordPress\AiClient\Providers\Http\Enums\HttpMethodEnum;
+use WordPress\AiClient\Providers\Http\Exception\ResponseException;
+use WordPress\AiClient\Providers\Http\Util\ResponseUtil;
+use WordPress\AiClient\Providers\Models\EmbeddingGeneration\Contracts\EmbeddingGenerationModelInterface;
+use WordPress\AiClient\Results\DTO\Embedding;
+use WordPress\AiClient\Results\DTO\EmbeddingResult;
+use WordPress\AiClient\Results\DTO\TokenUsage;
+use WordPress\GoogleAiProvider\Authentication\GoogleApiKeyRequestAuthentication;
+use WordPress\GoogleAiProvider\Provider\GoogleProvider;
+
+/**
+ * Class for a Google embedding generation model using the batchEmbedContents endpoint.
+ *
+ * @since n.e.x.t
+ *
+ * @phpstan-type EmbeddingData array{values?: list<float|int>}
+ * @phpstan-type UsageMetadata array{promptTokenCount?: int}
+ * @phpstan-type ResponseData array{embeddings?: list<EmbeddingData>, usageMetadata?: UsageMetadata}
+ */
+class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements EmbeddingGenerationModelInterface
+{
+    use WithFilePartDataTrait;
+
+    /**
+     * The maximum number of inputs the batchEmbedContents endpoint accepts per request.
+     *
+     * @since n.e.x.t
+     * @var int
+     */
+    protected const MAX_BATCH_SIZE = 100;
+
+    /**
+     * {@inheritDoc}
+     *
+     * @since n.e.x.t
+     */
+    public function getRequestAuthentication(): RequestAuthenticationInterface
+    {
+        /*
+         * Since we're calling the Google API here, we need to use the Google specific
+         * API key authentication class.
+         */
+        $requestAuthentication = parent::getRequestAuthentication();
+        if (!$requestAuthentication instanceof ApiKeyRequestAuthentication) {
+            return $requestAuthentication;
+        }
+        return new GoogleApiKeyRequestAuthentication($requestAuthentication->getApiKey());
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @since n.e.x.t
+     *
+     * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
+     * @return EmbeddingResult The embedding result.
+     */
+    public function generateEmbeddingResult(array $input): EmbeddingResult
+    {
+        $httpTransporter = $this->getHttpTransporter();
+
+        // Validate and prepare all inputs up front, so that no request is sent for invalid input.
+        $params = $this->prepareGenerateEmbeddingsParams($input);
+
+        /** @var non-empty-list<array<string, mixed>> $requests */
+        $requests = $params['requests'];
+
+        /*
+         * The API rejects batches with more than 100 requests, so larger inputs are split
+         * into multiple requests and the results are combined in input order.
+         */
+        $results = [];
+        foreach (array_chunk($requests, self::MAX_BATCH_SIZE) as $requestsChunk) {
+            $request = new Request(
+                HttpMethodEnum::POST(),
+                GoogleProvider::url("models/{$this->metadata()->getId()}:batchEmbedContents"),
+                ['Content-Type' => 'application/json'],
+                ['requests' => $requestsChunk],
+                $this->getRequestOptions()
+            );
+
+            // Add authentication credentials to the request.
+            $request = $this->getRequestAuthentication()->authenticateRequest($request);
+
+            // Send and process the request.
+            $response = $httpTransporter->send($request);
+            ResponseUtil::throwIfNotSuccessful($response);
+            $results[] = $this->parseResponseToEmbeddingResult($response, count($requestsChunk));
+        }
+
+        return $this->combineEmbeddingResults($results);
+    }
+
+    /**
+     * Prepares the given inputs and the model configuration into parameters for the API request.
+     *
+     * @since n.e.x.t
+     *
+     * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
+     * @return array<string, mixed> The parameters for the API request.
+     */
+    protected function prepareGenerateEmbeddingsParams(array $input): array
+    {
+        if (!array_is_list($input)) {
+            throw new InvalidArgumentException('Embedding input must be provided as a list of message parts.');
+        }
+
+        if (empty($input)) {
+            throw new InvalidArgumentException('The API requires at least one input.');
+        }
+
+        $modelName = 'models/' . $this->metadata()->getId();
+        $dimensions = $this->getConfig()->getDimensions();
+        $customOptions = $this->getConfig()->getCustomOptions();
+
+        $requests = [];
+        foreach ($input as $index => $part) {
+            $requestEntry = [
+                'model' => $modelName,
+                'content' => [
+                    'parts' => [
+                        $this->preparePartData($part, $index),
+                    ],
+                ],
+            ];
+
+            if ($dimensions !== null) {
+                $requestEntry['outputDimensionality'] = $dimensions;
+            }
+
+            foreach ($customOptions as $key => $value) {
+                if (isset($requestEntry[$key])) {
+                    throw new InvalidArgumentException(
+                        sprintf(
+                            'The custom option "%s" conflicts with an existing parameter.',
+                            $key
+                        )
+                    );
+                }
+                $requestEntry[$key] = $value;
+            }
+
+            $requests[] = $requestEntry;
+        }
+
+        return ['requests' => $requests];
+    }
+
+    /**
+     * Prepares a single input part into the Google API request part for one embedding input.
+     *
+     * Text and file parts are both supported. Whether the model actually accepts a given file
+     * modality is determined by the model's declared input modalities, not here. Conversation
+     * specific data such as thought markers and thought signatures is not sent.
+     *
+     * @since n.e.x.t
+     *
+     * @param mixed $part  The message part that makes up one embedding input.
+     * @param int   $index The index of the part within the input list, used for error messages.
+     * @return array<string, mixed> The Google API request part.
+     * @throws InvalidArgumentException If the part is not a supported, non-empty message part.
+     */
+    protected function preparePartData($part, int $index): array
+    {
+        if (!$part instanceof MessagePart) {
+            throw new InvalidArgumentException(
+                sprintf('Embedding input at index %d must be a MessagePart.', $index)
+            );
+        }
+
+        $type = $part->getType();
+        if (!$type->isText() && !$type->isFile()) {
+            throw new InvalidArgumentException(
+                sprintf('Google embedding input at index %d must be a text or file part.', $index)
+            );
+        }
+
+        if ($type->isText()) {
+            $text = $part->getText();
+            if ($text === null || trim($text) === '') {
+                throw new InvalidArgumentException(
+                    sprintf('Google embedding input at index %d must contain non-empty text.', $index)
+                );
+            }
+            return ['text' => $text];
+        }
+
+        $file = $part->getFile();
+        if (!$file) {
+            // This should be impossible due to class internals, but still needs to be checked.
+            throw new RuntimeException(
+                'The file typed message part must contain a file.'
+            );
+        }
+        return $this->getFilePartData($file);
+    }
+
+    /**
+     * Parses the response from the API endpoint to an embedding result.
+     *
+     * @since n.e.x.t
+     *
+     * @param Response $response      The response from the API endpoint.
+     * @param int      $expectedCount The number of inputs, i.e. the number of embeddings expected.
+     * @return EmbeddingResult The parsed embedding result.
+     */
+    protected function parseResponseToEmbeddingResult(Response $response, int $expectedCount): EmbeddingResult
+    {
+        /** @var ResponseData $responseData */
+        $responseData = $response->getData();
+
+        if (!isset($responseData['embeddings']) || !$responseData['embeddings']) {
+            throw ResponseException::fromMissingData($this->providerMetadata()->getName(), 'embeddings');
+        }
+        if (!is_array($responseData['embeddings']) || !array_is_list($responseData['embeddings'])) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                'embeddings',
+                'The value must be an indexed array.'
+            );
+        }
+
+        $embeddings = [];
+        foreach ($responseData['embeddings'] as $index => $embeddingData) {
+            if (
+                !is_array($embeddingData) ||
+                !isset($embeddingData['values']) ||
+                !is_array($embeddingData['values'])
+            ) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "embeddings[{$index}].values",
+                    'The value must be an embedding vector.'
+                );
+            }
+            $embeddings[] = new Embedding(
+                $embeddingData['values'],
+                count($embeddingData['values'])
+            );
+        }
+
+        if (count($embeddings) !== $expectedCount) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                'embeddings',
+                sprintf('Expected %d embeddings, but received %d.', $expectedCount, count($embeddings))
+            );
+        }
+
+        /*
+         * Newer models return usage metadata for embeddings, while older models do not.
+         */
+        $promptTokens = 0;
+        if (
+            isset($responseData['usageMetadata']['promptTokenCount']) &&
+            is_int($responseData['usageMetadata']['promptTokenCount'])
+        ) {
+            $promptTokens = $responseData['usageMetadata']['promptTokenCount'];
+        }
+        $tokenUsage = new TokenUsage($promptTokens, 0, $promptTokens);
+
+        $additionalData = $responseData;
+        unset($additionalData['embeddings'], $additionalData['usageMetadata']);
+
+        return new EmbeddingResult(
+            '',
+            $embeddings,
+            count($embeddings[0]->getValues()),
+            $tokenUsage,
+            $this->providerMetadata(),
+            $this->metadata(),
+            $additionalData
+        );
+    }
+
+    /**
+     * Combines the results of multiple batch requests into a single embedding result.
+     *
+     * @since n.e.x.t
+     *
+     * @param non-empty-list<EmbeddingResult> $results The results, in input order.
+     * @return EmbeddingResult The combined embedding result.
+     */
+    protected function combineEmbeddingResults(array $results): EmbeddingResult
+    {
+        if (count($results) === 1) {
+            return $results[0];
+        }
+
+        $embeddings = [];
+        $promptTokens = 0;
+        $additionalData = [];
+        foreach ($results as $result) {
+            foreach ($result->getEmbeddings() as $embedding) {
+                $embeddings[] = $embedding;
+            }
+            $promptTokens += $result->getTokenUsage()->getPromptTokens();
+            $additionalData = array_merge($additionalData, $result->getAdditionalData());
+        }
+
+        return new EmbeddingResult(
+            '',
+            $embeddings,
+            $results[0]->getDimensions(),
+            new TokenUsage($promptTokens, 0, $promptTokens),
+            $this->providerMetadata(),
+            $this->metadata(),
+            $additionalData
+        );
+    }
+}
