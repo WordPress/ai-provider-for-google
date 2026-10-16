@@ -391,7 +391,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 'name' => $functionCall->getName(),
             ];
             $functionCallId = $functionCall->getId();
-            if ($functionCallId !== null && $functionCallId !== '') {
+            if ($functionCallId !== null) {
                 $functionCallData['id'] = $functionCallId;
             }
             // Only include args if present; Google's API accepts omitting args for no-argument functions.
@@ -435,7 +435,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 ],
             ];
             $functionResponseId = $functionResponse->getId();
-            if ($functionResponseId !== null && $functionResponseId !== '') {
+            if ($functionResponseId !== null) {
                 $functionResponseData['id'] = $functionResponseId;
             }
             return [
@@ -530,15 +530,102 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
     {
         $preparedFunctionDeclarations = [];
         foreach ($functionDeclarations as $functionDeclaration) {
-            $data = $functionDeclaration->toArray();
-            if (isset($data['parameters'])) {
-                $data['parametersJsonSchema'] = $data['parameters'];
-                unset($data['parameters']);
+            /*
+             * Only send fields that the Google AI API knows. It rejects unknown fields, so newer
+             * fields from `toArray()` (such as `annotations`) must not be forwarded.
+             */
+            $data = [
+                'name' => $functionDeclaration->getName(),
+                'description' => $functionDeclaration->getDescription(),
+            ];
+            $parameters = $functionDeclaration->getParameters();
+            if ($parameters !== null) {
+                /*
+                 * The `parametersJsonSchema` field accepts standard JSON Schema. The legacy
+                 * `parameters` field only accepts an OpenAPI subset, which rejects keywords
+                 * such as `uniqueItems`, `additionalProperties` or boolean `enum` values.
+                 */
+                $data['parametersJsonSchema'] = $this->prepareJsonSchema($parameters);
             }
             $preparedFunctionDeclarations[] = $data;
         }
 
         return $preparedFunctionDeclarations;
+    }
+
+    /**
+     * Prepares a JSON schema so that it serializes to valid JSON for the Google AI API.
+     *
+     * PHP encodes empty arrays and sequential numeric keys as JSON lists. For keywords that expect
+     * an object, such as `properties`, maps are cast to objects to preserve their JSON shape.
+     * The same applies to empty sub-schemas, which mean "accept any value" in JSON Schema.
+     *
+     * @since n.e.x.t
+     *
+     * @param array<string, mixed> $schema The JSON schema.
+     * @return array<string, mixed> The prepared JSON schema.
+     */
+    protected function prepareJsonSchema(array $schema): array
+    {
+        // Keywords whose value is a map of names to sub-schemas.
+        foreach (['properties', 'patternProperties', '$defs', 'definitions', 'dependentSchemas'] as $keyword) {
+            if (isset($schema[$keyword]) && is_array($schema[$keyword])) {
+                foreach ($schema[$keyword] as $key => $childSchema) {
+                    $schema[$keyword][$key] = $this->prepareJsonSubschema($childSchema);
+                }
+                $schema[$keyword] = (object) $schema[$keyword];
+            }
+        }
+
+        // Keywords whose value is a single sub-schema.
+        foreach (['additionalProperties', 'not', 'contains', 'propertyNames'] as $keyword) {
+            if (isset($schema[$keyword]) && is_array($schema[$keyword])) {
+                $schema[$keyword] = $this->prepareJsonSubschema($schema[$keyword]);
+            }
+        }
+
+        // Keywords whose value is a list of sub-schemas.
+        foreach (['anyOf', 'oneOf', 'allOf', 'prefixItems'] as $keyword) {
+            if (isset($schema[$keyword]) && is_array($schema[$keyword])) {
+                foreach ($schema[$keyword] as $key => $childSchema) {
+                    $schema[$keyword][$key] = $this->prepareJsonSubschema($childSchema);
+                }
+            }
+        }
+
+        // The `items` keyword is either a single sub-schema or a list of sub-schemas.
+        if (isset($schema['items']) && is_array($schema['items'])) {
+            if ($schema['items'] !== [] && array_is_list($schema['items'])) {
+                foreach ($schema['items'] as $key => $itemSchema) {
+                    $schema['items'][$key] = $this->prepareJsonSubschema($itemSchema);
+                }
+            } else {
+                $schema['items'] = $this->prepareJsonSubschema($schema['items']);
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Prepares a single JSON sub-schema value.
+     *
+     * @since n.e.x.t
+     *
+     * @param mixed $schema The sub-schema value.
+     * @return mixed The prepared sub-schema value.
+     */
+    private function prepareJsonSubschema($schema)
+    {
+        if (!is_array($schema)) {
+            // For example a boolean schema, which is valid JSON Schema.
+            return $schema;
+        }
+        if ($schema === []) {
+            return new \stdClass();
+        }
+        /** @var array<string, mixed> $schema */
+        return $this->prepareJsonSchema($schema);
     }
 
     /**
@@ -843,9 +930,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (is_array($args) && count($args) === 0) {
                 $args = null;
             }
-            $functionCallId = isset($partData['functionCall']['id']) && is_string($partData['functionCall']['id'])
-                ? $partData['functionCall']['id']
-                : null;
+            $functionCallId = $partData['functionCall']['id'] ?? null;
             $functionCall = new FunctionCall(
                 $functionCallId,
                 $partData['functionCall']['name'],

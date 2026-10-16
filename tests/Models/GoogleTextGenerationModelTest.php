@@ -9,6 +9,7 @@ use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Providers\DTO\ProviderMetadata;
 use WordPress\AiClient\Providers\Enums\ProviderTypeEnum;
 use WordPress\AiClient\Providers\Http\DTO\Response;
+use WordPress\AiClient\Providers\Http\Exception\ResponseException;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
 use WordPress\AiClient\Providers\Models\Enums\CapabilityEnum;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
@@ -50,26 +51,14 @@ class GoogleTextGenerationModelTest extends TestCase
                         'enum' => [1, 2],
                     ],
                 ],
+                'has_published_posts' => [
+                    'type' => 'boolean',
+                    'enum' => [true],
+                ],
             ],
             'required' => ['value'],
         ];
-        $model = new class (
-            new ModelMetadata('gemini-test', 'Gemini test', [CapabilityEnum::textGeneration()], []),
-            new ProviderMetadata('google', 'Google', ProviderTypeEnum::cloud())
-        ) extends GoogleTextGenerationModel {
-            /**
-             * Prepares function declarations for a Google request.
-             *
-             * @param list<FunctionDeclaration> $declarations Function declarations.
-             * @return list<array<string, mixed>> Prepared declarations.
-             */
-            public function prepareFunctionDeclarations(array $declarations): array
-            {
-                return $this->prepareFunctionDeclarationsParam($declarations);
-            }
-        };
-
-        $prepared = $model->prepareFunctionDeclarations([
+        $prepared = $this->prepareFunctionDeclarations([
             new FunctionDeclaration('complex_tool', 'Accepts a complex schema.', $schema),
             new FunctionDeclaration('parameterless_tool', 'Accepts no parameters.'),
         ]);
@@ -86,7 +75,122 @@ class GoogleTextGenerationModelTest extends TestCase
                     'description' => 'Accepts no parameters.',
                 ],
             ],
-            $prepared
+            json_decode(json_encode($prepared, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR)
+        );
+    }
+
+    /**
+     * Tests that empty object keywords and empty sub-schemas are sent as JSON objects.
+     *
+     * @since n.e.x.t
+     */
+    public function testFunctionParametersEncodeEmptyMapsAsObjects(): void
+    {
+        $prepared = $this->prepareFunctionDeclarations([
+            new FunctionDeclaration(
+                'empty_tool',
+                'Accepts no parameters.',
+                ['type' => 'object', 'properties' => []]
+            ),
+            new FunctionDeclaration(
+                'nested_tool',
+                'Accepts nested schemas.',
+                [
+                    'type' => 'object',
+                    'properties' => [
+                        'options' => ['type' => 'object', 'properties' => []],
+                        'value' => [],
+                        'list' => ['type' => 'array', 'items' => []],
+                        'choice' => [
+                            'anyOf' => [
+                                ['type' => 'object', 'properties' => []],
+                                ['type' => 'string'],
+                            ],
+                        ],
+                    ],
+                    '$defs' => [],
+                ]
+            ),
+        ]);
+
+        $this->assertSame(
+            '[{"name":"empty_tool","description":"Accepts no parameters.",'
+            . '"parametersJsonSchema":{"type":"object","properties":{}}},'
+            . '{"name":"nested_tool","description":"Accepts nested schemas.",'
+            . '"parametersJsonSchema":{"type":"object","properties":{'
+            . '"options":{"type":"object","properties":{}},'
+            . '"value":{},'
+            . '"list":{"type":"array","items":{}},'
+            . '"choice":{"anyOf":[{"type":"object","properties":{}},{"type":"string"}]}'
+            . '},"$defs":{}}}]',
+            json_encode($prepared, JSON_THROW_ON_ERROR)
+        );
+    }
+
+    /**
+     * Tests that numeric schema map keys remain JSON object keys while literal arrays remain lists.
+     *
+     * @since n.e.x.t
+     */
+    public function testFunctionParametersEncodeNumericMapsAsObjects(): void
+    {
+        $prepared = $this->prepareFunctionDeclarations([
+            new FunctionDeclaration('numeric_tool', 'Accepts numeric property names.', [
+                'type' => 'object',
+                'properties' => [
+                    '0' => [
+                        'type' => 'object',
+                        'properties' => ['0' => ['type' => 'string']],
+                    ],
+                    '1' => ['type' => 'array', 'default' => [], 'examples' => [[]]],
+                ],
+                '$defs' => ['0' => ['type' => 'string']],
+                'required' => ['0'],
+                'additionalProperties' => false,
+            ]),
+        ]);
+
+        $this->assertSame(
+            '{"type":"object","properties":{'
+            . '"0":{"type":"object","properties":{"0":{"type":"string"}}},'
+            . '"1":{"type":"array","default":[],"examples":[[]]}},'
+            . '"$defs":{"0":{"type":"string"}},"required":["0"],"additionalProperties":false}',
+            json_encode($prepared[0]['parametersJsonSchema'], JSON_THROW_ON_ERROR)
+        );
+    }
+
+    /**
+     * Tests that function declaration fields unknown to the Google AI API are not sent.
+     *
+     * @since n.e.x.t
+     */
+    public function testFunctionDeclarationOmitsAnnotations(): void
+    {
+        if (!method_exists(FunctionDeclaration::class, 'getAnnotations')) {
+            $this->markTestSkipped('Function declaration annotations require php-ai-client 1.5.0 or later.');
+        }
+
+        $prepared = $this->prepareFunctionDeclarations([
+            new FunctionDeclaration(
+                'annotated_tool',
+                'Has annotations.',
+                ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]],
+                ['readOnlyHint' => true]
+            ),
+        ]);
+
+        $this->assertSame(
+            [
+                [
+                    'name' => 'annotated_tool',
+                    'description' => 'Has annotations.',
+                    'parametersJsonSchema' => [
+                        'type' => 'object',
+                        'properties' => ['id' => ['type' => 'integer']],
+                    ],
+                ],
+            ],
+            json_decode(json_encode($prepared, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR)
         );
     }
 
@@ -307,7 +411,7 @@ class GoogleTextGenerationModelTest extends TestCase
                 ],
             ],
             $model->preparePart(
-                new MessagePart(new FunctionCall('', 'lookup_post', ['id' => 42]))
+                new MessagePart(new FunctionCall(null, 'lookup_post', ['id' => 42]))
             )
         );
         $this->assertSame(
@@ -322,10 +426,74 @@ class GoogleTextGenerationModelTest extends TestCase
             ],
             $model->preparePart(
                 new MessagePart(
-                    new FunctionResponse('', 'lookup_post', ['title' => 'Hello world'])
+                    new FunctionResponse(null, 'lookup_post', ['title' => 'Hello world'])
                 )
             )
         );
+    }
+
+    /**
+     * Tests that absent and explicit null function call IDs are accepted.
+     *
+     * @since n.e.x.t
+     */
+    public function testFunctionCallWithoutId(): void
+    {
+        foreach ([[], ['id' => null]] as $idData) {
+            $result = $this->parseResponse([
+                'candidates' => [[
+                    'content' => ['parts' => [[
+                        'functionCall' => array_merge(['name' => 'lookup_post', 'args' => ['id' => 42]], $idData),
+                    ]]],
+                    'finishReason' => 'STOP',
+                ]],
+            ]);
+            $call = $result->getCandidates()[0]->getMessage()->getParts()[0]->getFunctionCall();
+
+            $this->assertNotNull($call);
+            $this->assertNull($call->getId());
+            $this->assertSame('lookup_post', $call->getName());
+            $this->assertSame(['id' => 42], $call->getArgs());
+        }
+    }
+
+    /**
+     * Tests that non-string function call IDs produce a response validation error.
+     *
+     * @since n.e.x.t
+     * @dataProvider invalidFunctionCallIds
+     *
+     * @param mixed $id Invalid ID received from the API.
+     */
+    public function testFunctionCallRejectsInvalidId($id): void
+    {
+        $this->expectException(ResponseException::class);
+        $this->expectExceptionMessage('Part has an invalid functionCall shape.');
+
+        $this->parseResponse([
+            'candidates' => [[
+                'content' => ['parts' => [[
+                    'functionCall' => ['name' => 'lookup_post', 'id' => $id],
+                ]]],
+                'finishReason' => 'STOP',
+            ]],
+        ]);
+    }
+
+    /**
+     * Provides non-string JSON values that cannot be function call IDs.
+     *
+     * @return array<string, array{mixed}> Invalid IDs.
+     */
+    public static function invalidFunctionCallIds(): array
+    {
+        return [
+            'integer' => [42],
+            'float' => [1.5],
+            'boolean' => [false],
+            'array' => [[]],
+            'object' => [new \stdClass()],
+        ];
     }
 
     /**
@@ -353,5 +521,32 @@ class GoogleTextGenerationModelTest extends TestCase
         };
 
         return $model->parseResponse(new Response(200, [], json_encode($data, JSON_THROW_ON_ERROR)));
+    }
+
+    /**
+     * Prepares function declarations through the model's protected method.
+     *
+     * @param list<FunctionDeclaration> $declarations Function declarations.
+     * @return list<array<string, mixed>> Prepared declarations.
+     */
+    private function prepareFunctionDeclarations(array $declarations): array
+    {
+        $model = new class (
+            new ModelMetadata('gemini-test', 'Gemini test', [CapabilityEnum::textGeneration()], []),
+            new ProviderMetadata('google', 'Google', ProviderTypeEnum::cloud())
+        ) extends GoogleTextGenerationModel {
+            /**
+             * Prepares function declarations for a Google request.
+             *
+             * @param list<FunctionDeclaration> $declarations Function declarations.
+             * @return list<array<string, mixed>> Prepared declarations.
+             */
+            public function prepareFunctionDeclarations(array $declarations): array
+            {
+                return $this->prepareFunctionDeclarationsParam($declarations);
+            }
+        };
+
+        return $model->prepareFunctionDeclarations($declarations);
     }
 }
