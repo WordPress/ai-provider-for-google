@@ -60,6 +60,27 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
     use WithAspectRatioTrait;
 
     /**
+     * Pattern for an http(s) URL. Response-supplied file references must match this before use.
+     *
+     * @since n.e.x.t
+     */
+    private const HTTP_URL_PATTERN = '/^https?:\/\//i';
+
+    /**
+     * Pattern for plain base64 data (no data URI prefix).
+     *
+     * @since n.e.x.t
+     */
+    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]+={0,2}$/D';
+
+    /**
+     * Pattern for a MIME type (type/subtype).
+     *
+     * @since n.e.x.t
+     */
+    private const MIME_TYPE_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*$/D';
+
+    /**
      * {@inheritDoc}
      *
      * @since 1.0.0
@@ -883,12 +904,24 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             ) {
                 throw new InvalidArgumentException('Part has an invalid inlineData shape.');
             }
+            if (
+                !isset($partData['inlineData']['mimeType']) ||
+                !is_string($partData['inlineData']['mimeType']) ||
+                !preg_match(self::MIME_TYPE_PATTERN, $partData['inlineData']['mimeType'])
+            ) {
+                throw new InvalidArgumentException('Part inlineData has a missing or invalid mimeType.');
+            }
+            if (!preg_match(self::BASE64_PATTERN, $partData['inlineData']['data'])) {
+                throw new InvalidArgumentException('Part inlineData.data is not valid base64 data.');
+            }
+            /*
+             * Response data is untrusted. Wrapping it in a data URI makes the SDK treat it strictly as inline
+             * base64 data; the raw string could otherwise be interpreted as a local file path.
+             */
             return new MessagePart(
                 new File(
-                    $partData['inlineData']['data'],
-                    isset($partData['inlineData']['mimeType']) && is_string($partData['inlineData']['mimeType']) ?
-                        $partData['inlineData']['mimeType'] :
-                        null
+                    'data:' . $partData['inlineData']['mimeType'] . ';base64,' . $partData['inlineData']['data'],
+                    $partData['inlineData']['mimeType']
                 ),
                 null,
                 $thoughtSignature
@@ -901,6 +934,10 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 !is_string($partData['fileData']['fileUri'])
             ) {
                 throw new InvalidArgumentException('Part has an invalid fileData shape.');
+            }
+            // Response data is untrusted: only http(s) URLs may be turned into remote files.
+            if (!preg_match(self::HTTP_URL_PATTERN, $partData['fileData']['fileUri'])) {
+                throw new InvalidArgumentException('Part fileData.fileUri must be an http(s) URL.');
             }
             return new MessagePart(
                 new File(

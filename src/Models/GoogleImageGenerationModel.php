@@ -55,6 +55,27 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
     use WithAspectRatioTrait;
 
     /**
+     * Pattern for an http(s) URL. Response-supplied file references must match this before use.
+     *
+     * @since n.e.x.t
+     */
+    private const HTTP_URL_PATTERN = '/^https?:\/\//i';
+
+    /**
+     * Pattern for plain base64 data (no data URI prefix).
+     *
+     * @since n.e.x.t
+     */
+    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]+={0,2}$/D';
+
+    /**
+     * Pattern for a MIME type (type/subtype).
+     *
+     * @since n.e.x.t
+     */
+    private const MIME_TYPE_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*$/D';
+
+    /**
      * {@inheritDoc}
      *
      * @since 1.0.0
@@ -334,11 +355,38 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         int $index,
         string $expectedMimeType = 'image/png'
     ): Candidate {
-        $mimeType = isset($predictionData['mimeType']) ? $predictionData['mimeType'] : $expectedMimeType;
+        $mimeType = isset($predictionData['mimeType']) && is_string($predictionData['mimeType'])
+            ? $predictionData['mimeType']
+            : $expectedMimeType;
+        if (!preg_match(self::MIME_TYPE_PATTERN, $mimeType)) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                "predictions[{$index}]",
+                'The mimeType value is invalid.'
+            );
+        }
 
+        /*
+         * Response data is untrusted: only http(s) URLs may become remote files, and bytes are always wrapped
+         * in a data URI so the SDK never interprets them as a local file path.
+         */
         if (isset($predictionData['url']) && is_string($predictionData['url'])) {
+            if (!preg_match(self::HTTP_URL_PATTERN, $predictionData['url'])) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    'The url value must be an http(s) URL.'
+                );
+            }
             $imageFile = new File($predictionData['url'], $mimeType);
         } elseif (isset($predictionData['bytesBase64Encoded']) && is_string($predictionData['bytesBase64Encoded'])) {
+            if (!preg_match(self::BASE64_PATTERN, $predictionData['bytesBase64Encoded'])) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    'The bytesBase64Encoded value is not valid base64 data.'
+                );
+            }
             $imageFile = new File('data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'], $mimeType);
         } else {
             throw ResponseException::fromInvalidData(
