@@ -29,6 +29,7 @@ use WordPress\AiClient\Tools\DTO\FunctionCall;
 use WordPress\AiClient\Tools\DTO\FunctionDeclaration;
 use WordPress\GoogleAiProvider\Authentication\GoogleApiKeyRequestAuthentication;
 use WordPress\GoogleAiProvider\Provider\GoogleProvider;
+use WordPress\GoogleAiProvider\Util\ResponseFileValidator;
 
 /**
  * Class for a Google text generation model.
@@ -58,27 +59,6 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface
 {
     use WithAspectRatioTrait;
-
-    /**
-     * Pattern for an http(s) URL. Response-supplied file references must match this before use.
-     *
-     * @since n.e.x.t
-     */
-    private const HTTP_URL_PATTERN = '/^https?:\/\//i';
-
-    /**
-     * Pattern for plain base64 data (no data URI prefix).
-     *
-     * @since n.e.x.t
-     */
-    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]*={0,2}$/D';
-
-    /**
-     * Pattern for a MIME type (type/subtype).
-     *
-     * @since n.e.x.t
-     */
-    private const MIME_TYPE_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*$/D';
 
     /**
      * {@inheritDoc}
@@ -907,11 +887,11 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             if (
                 !isset($partData['inlineData']['mimeType']) ||
                 !is_string($partData['inlineData']['mimeType']) ||
-                !preg_match(self::MIME_TYPE_PATTERN, $partData['inlineData']['mimeType'])
+                !ResponseFileValidator::isMimeType($partData['inlineData']['mimeType'])
             ) {
                 throw new InvalidArgumentException('Part inlineData has a missing or invalid mimeType.');
             }
-            if (!preg_match(self::BASE64_PATTERN, $partData['inlineData']['data'])) {
+            if (!ResponseFileValidator::isBase64($partData['inlineData']['data'])) {
                 throw new InvalidArgumentException('Part inlineData.data is not valid base64 data.');
             }
             /*
@@ -936,7 +916,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 throw new InvalidArgumentException('Part has an invalid fileData shape.');
             }
             // Response data is untrusted: only http(s) URLs may be turned into remote files.
-            if (!self::isHttpUrl($partData['fileData']['fileUri'])) {
+            if (!ResponseFileValidator::isHttpUrl($partData['fileData']['fileUri'])) {
                 throw new InvalidArgumentException('Part fileData.fileUri must be a valid http(s) URL.');
             }
             return new MessagePart(
@@ -1001,22 +981,5 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $thoughtSignature = $part->getThoughtSignature();
 
         return $thoughtSignature !== null && $thoughtSignature !== '' ? $thoughtSignature : null;
-    }
-
-    /**
-     * Checks whether the given string is a well-formed http(s) URL.
-     *
-     * Mirrors the SDK's own URL detection so that a value accepted here is never re-interpreted
-     * by the File constructor as something other than a remote URL.
-     *
-     * @since n.e.x.t
-     *
-     * @param string $url The value to check.
-     * @return bool True if the value is a valid http(s) URL.
-     */
-    private static function isHttpUrl(string $url): bool
-    {
-        return filter_var($url, FILTER_VALIDATE_URL) !== false
-            && preg_match(self::HTTP_URL_PATTERN, $url) === 1;
     }
 }

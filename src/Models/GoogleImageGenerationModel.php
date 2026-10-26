@@ -25,6 +25,7 @@ use WordPress\AiClient\Results\DTO\TokenUsage;
 use WordPress\AiClient\Results\Enums\FinishReasonEnum;
 use WordPress\GoogleAiProvider\Authentication\GoogleApiKeyRequestAuthentication;
 use WordPress\GoogleAiProvider\Provider\GoogleProvider;
+use WordPress\GoogleAiProvider\Util\ResponseFileValidator;
 
 /**
  * Class for a Google image generation model.
@@ -53,27 +54,6 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageGenerationModelInterface
 {
     use WithAspectRatioTrait;
-
-    /**
-     * Pattern for an http(s) URL. Response-supplied file references must match this before use.
-     *
-     * @since n.e.x.t
-     */
-    private const HTTP_URL_PATTERN = '/^https?:\/\//i';
-
-    /**
-     * Pattern for plain base64 data (no data URI prefix).
-     *
-     * @since n.e.x.t
-     */
-    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]*={0,2}$/D';
-
-    /**
-     * Pattern for a MIME type (type/subtype).
-     *
-     * @since n.e.x.t
-     */
-    private const MIME_TYPE_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_+.]*$/D';
 
     /**
      * {@inheritDoc}
@@ -358,7 +338,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         $mimeType = isset($predictionData['mimeType']) && is_string($predictionData['mimeType'])
             ? $predictionData['mimeType']
             : $expectedMimeType;
-        if (!preg_match(self::MIME_TYPE_PATTERN, $mimeType)) {
+        if (!ResponseFileValidator::isMimeType($mimeType)) {
             throw ResponseException::fromInvalidData(
                 $this->providerMetadata()->getName(),
                 "predictions[{$index}]",
@@ -371,7 +351,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
          * in a data URI so the SDK never interprets them as a local file path.
          */
         if (isset($predictionData['url']) && is_string($predictionData['url'])) {
-            if (!self::isHttpUrl($predictionData['url'])) {
+            if (!ResponseFileValidator::isHttpUrl($predictionData['url'])) {
                 throw ResponseException::fromInvalidData(
                     $this->providerMetadata()->getName(),
                     "predictions[{$index}]",
@@ -388,7 +368,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
                 );
             }
         } elseif (isset($predictionData['bytesBase64Encoded']) && is_string($predictionData['bytesBase64Encoded'])) {
-            if (!preg_match(self::BASE64_PATTERN, $predictionData['bytesBase64Encoded'])) {
+            if (!ResponseFileValidator::isBase64($predictionData['bytesBase64Encoded'])) {
                 throw ResponseException::fromInvalidData(
                     $this->providerMetadata()->getName(),
                     "predictions[{$index}]",
@@ -420,22 +400,5 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         $message = new Message(MessageRoleEnum::model(), $parts);
 
         return new Candidate($message, FinishReasonEnum::stop());
-    }
-
-    /**
-     * Checks whether the given string is a well-formed http(s) URL.
-     *
-     * Mirrors the SDK's own URL detection so that a value accepted here is never re-interpreted
-     * by the File constructor as something other than a remote URL.
-     *
-     * @since n.e.x.t
-     *
-     * @param string $url The value to check.
-     * @return bool True if the value is a valid http(s) URL.
-     */
-    private static function isHttpUrl(string $url): bool
-    {
-        return filter_var($url, FILTER_VALIDATE_URL) !== false
-            && preg_match(self::HTTP_URL_PATTERN, $url) === 1;
     }
 }
