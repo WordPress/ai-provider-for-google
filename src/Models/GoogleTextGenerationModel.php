@@ -71,7 +71,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      *
      * @since n.e.x.t
      */
-    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]+={0,2}$/D';
+    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]*={0,2}$/D';
 
     /**
      * Pattern for a MIME type (type/subtype).
@@ -936,8 +936,8 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 throw new InvalidArgumentException('Part has an invalid fileData shape.');
             }
             // Response data is untrusted: only http(s) URLs may be turned into remote files.
-            if (!preg_match(self::HTTP_URL_PATTERN, $partData['fileData']['fileUri'])) {
-                throw new InvalidArgumentException('Part fileData.fileUri must be an http(s) URL.');
+            if (!self::isHttpUrl($partData['fileData']['fileUri'])) {
+                throw new InvalidArgumentException('Part fileData.fileUri must be a valid http(s) URL.');
             }
             return new MessagePart(
                 new File(
@@ -1001,5 +1001,22 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
         $thoughtSignature = $part->getThoughtSignature();
 
         return $thoughtSignature !== null && $thoughtSignature !== '' ? $thoughtSignature : null;
+    }
+
+    /**
+     * Checks whether the given string is a well-formed http(s) URL.
+     *
+     * Mirrors the SDK's own URL detection so that a value accepted here is never re-interpreted
+     * by the File constructor as something other than a remote URL.
+     *
+     * @since n.e.x.t
+     *
+     * @param string $url The value to check.
+     * @return bool True if the value is a valid http(s) URL.
+     */
+    private static function isHttpUrl(string $url): bool
+    {
+        return filter_var($url, FILTER_VALIDATE_URL) !== false
+            && preg_match(self::HTTP_URL_PATTERN, $url) === 1;
     }
 }

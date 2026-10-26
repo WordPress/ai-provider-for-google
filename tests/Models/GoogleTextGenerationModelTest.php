@@ -630,7 +630,7 @@ class GoogleTextGenerationModelTest extends TestCase
     public function testFileDataPartRejectsNonHttpUri(string $fileUri): void
     {
         $this->expectException(ResponseException::class);
-        $this->expectExceptionMessage('fileData.fileUri must be an http(s) URL');
+        $this->expectExceptionMessage('fileData.fileUri must be a valid http(s) URL');
 
         $this->parseResponse([
             'candidates' => [
@@ -685,5 +685,141 @@ class GoogleTextGenerationModelTest extends TestCase
         $this->assertNotNull($file);
         $this->assertTrue($file->isRemote());
         $this->assertSame('https://example.com/a.png', $file->getUrl());
+    }
+
+
+    /**
+     * Tests that an empty inline payload is accepted as an empty inline file.
+     *
+     * @since n.e.x.t
+     */
+    public function testInlineDataPartAcceptsEmptyPayload(): void
+    {
+        $result = $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => '']]]],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+
+        $file = $result->getCandidates()[0]->getMessage()->getParts()[0]->getFile();
+        $this->assertNotNull($file);
+        $this->assertTrue($file->isInline());
+        $this->assertSame('', $file->getBase64Data());
+    }
+
+    /**
+     * Tests that inline payloads with a trailing newline are rejected and the part index is reported.
+     *
+     * @since n.e.x.t
+     */
+    public function testInlineDataPartRejectsTrailingNewline(): void
+    {
+        $this->expectException(ResponseException::class);
+        $this->expectExceptionMessage('candidates[0].content.parts[1]');
+
+        $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            ['text' => 'ok'],
+                            ['inlineData' => ['mimeType' => 'image/png', 'data' => "iVBORw0KGgo=\n"]],
+                        ],
+                    ],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Tests that MIME types are matched case-insensitively.
+     *
+     * @since n.e.x.t
+     */
+    public function testInlineDataPartAcceptsMixedCaseMimeType(): void
+    {
+        $result = $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => ['parts' => [['inlineData' => ['mimeType' => 'Image/PNG', 'data' => 'iVBORw0KGgo=']]]],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+
+        $file = $result->getCandidates()[0]->getMessage()->getParts()[0]->getFile();
+        $this->assertNotNull($file);
+        $this->assertSame('iVBORw0KGgo=', $file->getBase64Data());
+    }
+
+    /**
+     * Tests that an upper-case http(s) scheme is accepted for file references.
+     *
+     * @since n.e.x.t
+     */
+    public function testFileDataPartAcceptsUpperCaseScheme(): void
+    {
+        $result = $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            ['fileData' => ['mimeType' => 'image/png', 'fileUri' => 'HTTPS://example.com/a.png']],
+                        ],
+                    ],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+
+        $file = $result->getCandidates()[0]->getMessage()->getParts()[0]->getFile();
+        $this->assertNotNull($file);
+        $this->assertTrue($file->isRemote());
+    }
+
+    /**
+     * Tests that http(s)-prefixed values that are not valid URLs are rejected with the part index.
+     *
+     * @dataProvider malformedHttpFileUriProvider
+     *
+     * @since n.e.x.t
+     *
+     * @param string $fileUri The response-supplied file URI.
+     */
+    public function testFileDataPartRejectsMalformedHttpUri(string $fileUri): void
+    {
+        $this->expectException(ResponseException::class);
+        $this->expectExceptionMessage('candidates[0].content.parts[0]');
+
+        $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [['fileData' => ['mimeType' => 'image/png', 'fileUri' => $fileUri]]],
+                    ],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Provides http(s)-prefixed values that are not valid URLs.
+     *
+     * @since n.e.x.t
+     *
+     * @return array<string, array{string}>
+     */
+    public function malformedHttpFileUriProvider(): array
+    {
+        return [
+            'scheme only' => ['http://'],
+            'space in host' => ['http://exam ple.com/a.png'],
+            'trailing newline' => ["https://example.com/a.png\n"],
+        ];
     }
 }

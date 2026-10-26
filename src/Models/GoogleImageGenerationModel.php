@@ -66,7 +66,7 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
      *
      * @since n.e.x.t
      */
-    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]+={0,2}$/D';
+    private const BASE64_PATTERN = '/^[A-Za-z0-9+\/]*={0,2}$/D';
 
     /**
      * Pattern for a MIME type (type/subtype).
@@ -371,14 +371,22 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
          * in a data URI so the SDK never interprets them as a local file path.
          */
         if (isset($predictionData['url']) && is_string($predictionData['url'])) {
-            if (!preg_match(self::HTTP_URL_PATTERN, $predictionData['url'])) {
+            if (!self::isHttpUrl($predictionData['url'])) {
                 throw ResponseException::fromInvalidData(
                     $this->providerMetadata()->getName(),
                     "predictions[{$index}]",
-                    'The url value must be an http(s) URL.'
+                    'The url value must be a valid http(s) URL.'
                 );
             }
-            $imageFile = new File($predictionData['url'], $mimeType);
+            try {
+                $imageFile = new File($predictionData['url'], $mimeType);
+            } catch (InvalidArgumentException $e) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    $e->getMessage()
+                );
+            }
         } elseif (isset($predictionData['bytesBase64Encoded']) && is_string($predictionData['bytesBase64Encoded'])) {
             if (!preg_match(self::BASE64_PATTERN, $predictionData['bytesBase64Encoded'])) {
                 throw ResponseException::fromInvalidData(
@@ -387,7 +395,18 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
                     'The bytesBase64Encoded value is not valid base64 data.'
                 );
             }
-            $imageFile = new File('data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'], $mimeType);
+            try {
+                $imageFile = new File(
+                    'data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'],
+                    $mimeType
+                );
+            } catch (InvalidArgumentException $e) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    $e->getMessage()
+                );
+            }
         } else {
             throw ResponseException::fromInvalidData(
                 $this->providerMetadata()->getName(),
@@ -401,5 +420,22 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         $message = new Message(MessageRoleEnum::model(), $parts);
 
         return new Candidate($message, FinishReasonEnum::stop());
+    }
+
+    /**
+     * Checks whether the given string is a well-formed http(s) URL.
+     *
+     * Mirrors the SDK's own URL detection so that a value accepted here is never re-interpreted
+     * by the File constructor as something other than a remote URL.
+     *
+     * @since n.e.x.t
+     *
+     * @param string $url The value to check.
+     * @return bool True if the value is a valid http(s) URL.
+     */
+    private static function isHttpUrl(string $url): bool
+    {
+        return filter_var($url, FILTER_VALIDATE_URL) !== false
+            && preg_match(self::HTTP_URL_PATTERN, $url) === 1;
     }
 }
