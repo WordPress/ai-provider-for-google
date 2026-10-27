@@ -10,7 +10,7 @@ use WordPress\GoogleAiProvider\Util\ResponseFileValidator;
 /**
  * Tests for ResponseFileValidator.
  *
- * @since n.e.x.t
+ * @since 1.2.1
  */
 class ResponseFileValidatorTest extends TestCase
 {
@@ -19,7 +19,7 @@ class ResponseFileValidatorTest extends TestCase
      *
      * @dataProvider httpUrlProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $value The value to check.
      * @param bool $expected The expected result.
@@ -32,7 +32,7 @@ class ResponseFileValidatorTest extends TestCase
     /**
      * Provides URL test cases.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string, bool}>
      */
@@ -60,7 +60,7 @@ class ResponseFileValidatorTest extends TestCase
      *
      * @dataProvider base64Provider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $value The value to check.
      * @param bool $expected The expected result.
@@ -73,7 +73,7 @@ class ResponseFileValidatorTest extends TestCase
     /**
      * Provides base64 test cases.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string, bool}>
      */
@@ -99,7 +99,7 @@ class ResponseFileValidatorTest extends TestCase
      *
      * @dataProvider mimeTypeProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $value The value to check.
      * @param bool $expected The expected result.
@@ -112,7 +112,7 @@ class ResponseFileValidatorTest extends TestCase
     /**
      * Provides MIME type test cases.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string, bool}>
      */

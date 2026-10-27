@@ -17,14 +17,14 @@ use WordPress\GoogleAiProvider\Models\GoogleImageGenerationModel;
 /**
  * Tests for GoogleImageGenerationModel response parsing.
  *
- * @since n.e.x.t
+ * @since 1.2.1
  */
 class GoogleImageGenerationModelTest extends TestCase
 {
     /**
      * Tests that base64 prediction bytes are parsed as an inline image.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testBytesBase64EncodedIsParsedAsInlineImage(): void
     {
@@ -44,7 +44,7 @@ class GoogleImageGenerationModelTest extends TestCase
      *
      * @dataProvider nonHttpUrlProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $url The response-supplied URL.
      */
@@ -59,7 +59,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Provides URLs that must be rejected.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string}>
      */
@@ -75,7 +75,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that prediction bytes that are not base64 are rejected.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testBytesBase64EncodedRejectsNonBase64(): void
     {
@@ -88,7 +88,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that an invalid prediction MIME type is rejected.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInvalidMimeTypeIsRejected(): void
     {
@@ -101,7 +101,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Parses a response array through the model.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param array<string, mixed> $data The response data.
      * @return GenerativeAiResult The parsed result.
@@ -133,7 +133,7 @@ class GoogleImageGenerationModelTest extends TestCase
      *
      * @dataProvider httpUrlProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $url The response-supplied URL.
      */
@@ -151,7 +151,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Provides http(s) URLs that must be accepted.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string}>
      */
@@ -169,7 +169,7 @@ class GoogleImageGenerationModelTest extends TestCase
      *
      * @dataProvider malformedHttpUrlProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $url The response-supplied URL.
      */
@@ -189,7 +189,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Provides http(s)-prefixed values that are not valid URLs.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string}>
      */
@@ -205,7 +205,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that an empty prediction payload is accepted as an empty inline file.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testBytesBase64EncodedAcceptsEmptyPayload(): void
     {
@@ -220,7 +220,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that base64 payloads with a trailing newline are rejected with the prediction index.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testBytesBase64EncodedRejectsTrailingNewline(): void
     {
@@ -235,7 +235,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that a prediction naming an existing local file is rejected and the file is not read.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testBytesBase64EncodedDoesNotReadExistingFile(): void
     {
@@ -258,7 +258,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that MIME types are matched case-insensitively.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testMixedCaseMimeTypeIsAccepted(): void
     {
@@ -274,7 +274,7 @@ class GoogleImageGenerationModelTest extends TestCase
     /**
      * Tests that a MIME type with a trailing newline is rejected with the prediction index.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testMimeTypeWithTrailingNewlineIsRejected(): void
     {

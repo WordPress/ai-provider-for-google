@@ -3,7 +3,7 @@ Contributors:      wordpressdotorg
 Tags:              ai, google, gemini, artificial-intelligence, connector
 Requires at least: 6.9
 Tested up to:      7.1
-Stable tag:        1.2.0
+Stable tag:        1.2.1
 Requires PHP:      7.4
 License:           GPL-2.0-or-later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -48,6 +48,24 @@ Visit the [Google AI Studio](https://aistudio.google.com/) to create an API key 
 No, this plugin requires the PHP AI Client plugin to be installed and activated. It provides the Google-specific implementation that the PHP AI Client uses.
 
 == Changelog ==
+
+= 1.2.1 - 2026-10-27 =
+
+**Changed**
+
+* Hardened response file handling by validating and explicitly encoding all model-supplied file data (URLs, MIME types, base64 payloads, including TTS audio) before `File` construction, with clearer indexed `ResponseException` errors and expanded test coverage ([#55](https://github.com/WordPress/ai-provider-for-google/pull/55)).
+
+**Fixed**
+
+* Google tool-calling compatibility by switching function declarations to `parametersJsonSchema`, normalizing schema maps/empty schemas to JSON objects, filtering unsupported declaration fields (e.g., `annotations`), and preserving Gemini function call IDs across continuation requests ([#51](https://github.com/WordPress/ai-provider-for-google/pull/51)).
+
+**Developer**
+
+* Excluded `tests/` and `phpunit.xml.dist` from Composer package archives by adding `export-ignore` rules to `.gitattributes`, so these development/testing files are no longer shipped in consumers’ `vendor/` directories ([#48](https://github.com/WordPress/ai-provider-for-google/pull/48)).
+* Added unit tests for `GoogleTextToSpeechConversionModel`, covering request preparation, prompt parsing, audio/WAV response handling, and authentication behavior ([#49](https://github.com/WordPress/ai-provider-for-google/pull/49)).
+* Added security issue reporting guidance to `SECURITY.md`, including responsible disclosure instructions and a link to the official WordPress HackerOne program for submitting security concerns ([#52](https://github.com/WordPress/ai-provider-for-google/pull/52)).
+* Added a `.github/CODEOWNERS` global fallback entry assigning ownership of all files to `@WordPress/ai-provider-for-google-maintainers` when no more specific rule matches ([#53](https://github.com/WordPress/ai-provider-for-google/pull/53)).
+* Added maintainer and contribution documentation by introducing `CONTRIBUTING.md` and updating `README.md` with current maintainer contacts ([#54](https://github.com/WordPress/ai-provider-for-google/pull/54)).
 
 = 1.2.0 - 2026-09-21 =
 

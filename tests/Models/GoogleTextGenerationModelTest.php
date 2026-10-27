@@ -28,7 +28,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that function parameters are forwarded as standard JSON Schema.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionParametersUseJsonSchemaField(): void
     {
@@ -82,7 +82,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that empty object keywords and empty sub-schemas are sent as JSON objects.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionParametersEncodeEmptyMapsAsObjects(): void
     {
@@ -130,7 +130,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that numeric schema map keys remain JSON object keys while literal arrays remain lists.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionParametersEncodeNumericMapsAsObjects(): void
     {
@@ -162,7 +162,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that function declaration fields unknown to the Google AI API are not sent.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionDeclarationOmitsAnnotations(): void
     {
@@ -320,7 +320,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that Gemini function call IDs survive the response and request round trip.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionCallIdRoundTrip(): void
     {
@@ -435,7 +435,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that absent and explicit null function call IDs are accepted.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFunctionCallWithoutId(): void
     {
@@ -460,7 +460,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that non-string function call IDs produce a response validation error.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      * @dataProvider invalidFunctionCallIds
      *
      * @param mixed $id Invalid ID received from the API.
@@ -553,7 +553,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that inline response data is accepted as base64 and never treated as a local file path.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartIsParsedAsBase64(): void
     {
@@ -579,7 +579,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that inline response data naming a local file is rejected and the file is not read.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartRejectsLocalFilePath(): void
     {
@@ -601,7 +601,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that inline response data without a MIME type is rejected.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartRequiresMimeType(): void
     {
@@ -623,7 +623,7 @@ class GoogleTextGenerationModelTest extends TestCase
      *
      * @dataProvider nonHttpFileUriProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $fileUri The response-supplied file URI.
      */
@@ -647,7 +647,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Provides file URIs that must be rejected.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string}>
      */
@@ -664,7 +664,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that http(s) file references are kept as remote files.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFileDataPartAcceptsHttpUri(): void
     {
@@ -691,7 +691,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that an empty inline payload is accepted as an empty inline file.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartAcceptsEmptyPayload(): void
     {
@@ -713,7 +713,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that inline payloads with a trailing newline are rejected and the part index is reported.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartRejectsTrailingNewline(): void
     {
@@ -738,7 +738,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that MIME types are matched case-insensitively.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testInlineDataPartAcceptsMixedCaseMimeType(): void
     {
@@ -759,7 +759,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that an upper-case http(s) scheme is accepted for file references.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      */
     public function testFileDataPartAcceptsUpperCaseScheme(): void
     {
@@ -786,7 +786,7 @@ class GoogleTextGenerationModelTest extends TestCase
      *
      * @dataProvider malformedHttpFileUriProvider
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param string $fileUri The response-supplied file URI.
      */
@@ -810,7 +810,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Provides http(s)-prefixed values that are not valid URLs.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @return array<string, array{string}>
      */
