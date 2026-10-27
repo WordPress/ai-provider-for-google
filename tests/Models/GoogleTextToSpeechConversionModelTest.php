@@ -669,4 +669,60 @@ Third line of speech.",
 
         $this->assertSame($customAuth, $auth);
     }
+
+
+    /**
+     * Tests that the generated WAV is never confused with a local file whose name equals its base64 form.
+     *
+     * @since n.e.x.t
+     */
+    public function testParseResponseDoesNotReadFileNamedAfterGeneratedAudio(): void
+    {
+        // Pick PCM bytes whose WAV base64 form contains no slash, so it is usable as a file name.
+        $rawPcm = '';
+        $wavBase64 = '';
+        for ($i = 0; $i < 1000; $i++) {
+            $rawPcm = 'pcm' . $i;
+            $wavBase64 = base64_encode($this->wrapPcm($rawPcm, 24000, 1, 16));
+            if (strpos($wavBase64, '/') === false) {
+                break;
+            }
+        }
+        $this->assertStringNotContainsString('/', $wavBase64);
+
+        $dir = sys_get_temp_dir() . '/gtts' . uniqid();
+        mkdir($dir);
+        file_put_contents($dir . '/' . $wavBase64, 'SECRET');
+        $cwd = getcwd();
+        $this->assertIsString($cwd);
+        chdir($dir);
+
+        try {
+            $result = $this->parseResponse([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'inlineData' => [
+                                        'data' => base64_encode($rawPcm),
+                                        'mimeType' => 'audio/L16;codec=pcm;rate=24000',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+        } finally {
+            chdir($cwd);
+            unlink($dir . '/' . $wavBase64);
+            rmdir($dir);
+        }
+
+        $file = $result->getCandidates()[0]->getMessage()->getParts()[0]->getFile();
+        $this->assertNotNull($file);
+        $this->assertSame($wavBase64, $file->getBase64Data());
+        $this->assertNotSame(base64_encode('SECRET'), $file->getBase64Data());
+    }
 }

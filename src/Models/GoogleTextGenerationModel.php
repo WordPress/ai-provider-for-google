@@ -29,6 +29,7 @@ use WordPress\AiClient\Tools\DTO\FunctionCall;
 use WordPress\AiClient\Tools\DTO\FunctionDeclaration;
 use WordPress\GoogleAiProvider\Authentication\GoogleApiKeyRequestAuthentication;
 use WordPress\GoogleAiProvider\Provider\GoogleProvider;
+use WordPress\GoogleAiProvider\Util\ResponseFileValidator;
 
 /**
  * Class for a Google text generation model.
@@ -883,12 +884,24 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             ) {
                 throw new InvalidArgumentException('Part has an invalid inlineData shape.');
             }
+            if (
+                !isset($partData['inlineData']['mimeType']) ||
+                !is_string($partData['inlineData']['mimeType']) ||
+                !ResponseFileValidator::isMimeType($partData['inlineData']['mimeType'])
+            ) {
+                throw new InvalidArgumentException('Part inlineData has a missing or invalid mimeType.');
+            }
+            if (!ResponseFileValidator::isBase64($partData['inlineData']['data'])) {
+                throw new InvalidArgumentException('Part inlineData.data is not valid base64 data.');
+            }
+            /*
+             * Response data is untrusted. Wrapping it in a data URI makes the SDK treat it strictly as inline
+             * base64 data; the raw string could otherwise be interpreted as a local file path.
+             */
             return new MessagePart(
                 new File(
-                    $partData['inlineData']['data'],
-                    isset($partData['inlineData']['mimeType']) && is_string($partData['inlineData']['mimeType']) ?
-                        $partData['inlineData']['mimeType'] :
-                        null
+                    'data:' . $partData['inlineData']['mimeType'] . ';base64,' . $partData['inlineData']['data'],
+                    $partData['inlineData']['mimeType']
                 ),
                 null,
                 $thoughtSignature
@@ -901,6 +914,10 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 !is_string($partData['fileData']['fileUri'])
             ) {
                 throw new InvalidArgumentException('Part has an invalid fileData shape.');
+            }
+            // Response data is untrusted: only http(s) URLs may be turned into remote files.
+            if (!ResponseFileValidator::isHttpUrl($partData['fileData']['fileUri'])) {
+                throw new InvalidArgumentException('Part fileData.fileUri must be a valid http(s) URL.');
             }
             return new MessagePart(
                 new File(
