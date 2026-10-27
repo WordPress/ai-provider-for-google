@@ -561,7 +561,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      * an object, such as `properties`, maps are cast to objects to preserve their JSON shape.
      * The same applies to empty sub-schemas, which mean "accept any value" in JSON Schema.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param array<string, mixed> $schema The JSON schema.
      * @return array<string, mixed> The prepared JSON schema.
@@ -611,7 +611,7 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
     /**
      * Prepares a single JSON sub-schema value.
      *
-     * @since n.e.x.t
+     * @since 1.2.1
      *
      * @param mixed $schema The sub-schema value.
      * @return mixed The prepared sub-schema value.
