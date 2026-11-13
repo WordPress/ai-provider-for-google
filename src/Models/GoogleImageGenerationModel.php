@@ -25,6 +25,7 @@ use WordPress\AiClient\Results\DTO\TokenUsage;
 use WordPress\AiClient\Results\Enums\FinishReasonEnum;
 use WordPress\GoogleAiProvider\Authentication\GoogleApiKeyRequestAuthentication;
 use WordPress\GoogleAiProvider\Provider\GoogleProvider;
+use WordPress\GoogleAiProvider\Util\ResponseFileValidator;
 
 /**
  * Class for a Google image generation model.
@@ -334,12 +335,58 @@ class GoogleImageGenerationModel extends AbstractApiBasedModel implements ImageG
         int $index,
         string $expectedMimeType = 'image/png'
     ): Candidate {
-        $mimeType = isset($predictionData['mimeType']) ? $predictionData['mimeType'] : $expectedMimeType;
+        $mimeType = isset($predictionData['mimeType']) && is_string($predictionData['mimeType'])
+            ? $predictionData['mimeType']
+            : $expectedMimeType;
+        if (!ResponseFileValidator::isMimeType($mimeType)) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                "predictions[{$index}]",
+                'The mimeType value is invalid.'
+            );
+        }
 
+        /*
+         * Response data is untrusted: only http(s) URLs may become remote files, and bytes are always wrapped
+         * in a data URI so the SDK never interprets them as a local file path.
+         */
         if (isset($predictionData['url']) && is_string($predictionData['url'])) {
-            $imageFile = new File($predictionData['url'], $mimeType);
+            if (!ResponseFileValidator::isHttpUrl($predictionData['url'])) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    'The url value must be a valid http(s) URL.'
+                );
+            }
+            try {
+                $imageFile = new File($predictionData['url'], $mimeType);
+            } catch (InvalidArgumentException $e) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    $e->getMessage()
+                );
+            }
         } elseif (isset($predictionData['bytesBase64Encoded']) && is_string($predictionData['bytesBase64Encoded'])) {
-            $imageFile = new File('data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'], $mimeType);
+            if (!ResponseFileValidator::isBase64($predictionData['bytesBase64Encoded'])) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    'The bytesBase64Encoded value is not valid base64 data.'
+                );
+            }
+            try {
+                $imageFile = new File(
+                    'data:' . $mimeType . ';base64,' . $predictionData['bytesBase64Encoded'],
+                    $mimeType
+                );
+            } catch (InvalidArgumentException $e) {
+                throw ResponseException::fromInvalidData(
+                    $this->providerMetadata()->getName(),
+                    "predictions[{$index}]",
+                    $e->getMessage()
+                );
+            }
         } else {
             throw ResponseException::fromInvalidData(
                 $this->providerMetadata()->getName(),

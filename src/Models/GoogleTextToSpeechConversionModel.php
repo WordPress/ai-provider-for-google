@@ -249,7 +249,11 @@ class GoogleTextToSpeechConversionModel extends AbstractApiBasedModel implements
         $sampleRate = $this->parseSampleRate($inlineData['mimeType']);
         $wav        = $this->wrapPcmInWav($pcm, $sampleRate);
 
-        $audioFile = new File(base64_encode($wav), 'audio/wav');
+        /*
+         * Wrap the generated audio in a data URI so the SDK treats it strictly as inline data and never
+         * tries to interpret the base64 string as a local file path.
+         */
+        $audioFile = new File('data:audio/wav;base64,' . base64_encode($wav), 'audio/wav');
 
         $message   = new Message(MessageRoleEnum::model(), [new MessagePart($audioFile)]);
         $candidate = new Candidate($message, FinishReasonEnum::stop());
