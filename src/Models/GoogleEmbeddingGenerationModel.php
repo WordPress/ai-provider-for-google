@@ -191,7 +191,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
 
         if ($type->isText()) {
             $text = $part->getText();
-            if ($text === null || trim($text) === '') {
+            if ($text === null || trim($text, " \n\r\t\v\0") === '') {
                 throw new InvalidArgumentException(
                     sprintf('Google embedding input at index %d must contain non-empty text.', $index)
                 );
