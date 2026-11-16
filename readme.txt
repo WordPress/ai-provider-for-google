@@ -50,6 +50,12 @@ No, this plugin requires the PHP AI Client plugin to be installed and activated.
 
 == Changelog ==
 
+= 1.3.0 - 2026-11-17 =
+
+**Added**
+
+- Added support for embedding generation ([#30](https://github.com/WordPress/ai-provider-for-google/pull/30)).
+
 = 1.2.1 - 2026-10-27 =
 
 **Changed**
