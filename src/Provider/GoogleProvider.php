@@ -15,7 +15,9 @@ use WordPress\AiClient\Providers\Enums\ProviderTypeEnum;
 use WordPress\AiClient\Providers\Http\Enums\RequestAuthenticationMethod;
 use WordPress\AiClient\Providers\Models\Contracts\ModelInterface;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
+use WordPress\AiClient\Providers\Models\EmbeddingGeneration\Contracts\EmbeddingGenerationModelInterface;
 use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
+use WordPress\GoogleAiProvider\Models\GoogleEmbeddingGenerationModel;
 use WordPress\GoogleAiProvider\Models\GoogleImageGenerationModel;
 use WordPress\GoogleAiProvider\Models\GoogleTextAndImageGenerationModel;
 use WordPress\GoogleAiProvider\Models\GoogleTextGenerationModel;
@@ -67,6 +69,13 @@ class GoogleProvider extends AbstractApiProvider
             if ($capability->isImageGeneration()) {
                 return new GoogleImageGenerationModel($modelMetadata, $providerMetadata);
             }
+            // Embedding generation support was added in 1.4.0.
+            if (
+                $capability->isEmbeddingGeneration() &&
+                interface_exists(EmbeddingGenerationModelInterface::class)
+            ) {
+                return new GoogleEmbeddingGenerationModel($modelMetadata, $providerMetadata);
+            }
         }
 
         throw new RuntimeException(
@@ -93,9 +102,9 @@ class GoogleProvider extends AbstractApiProvider
             // For WordPress, we should translate the description.
             if (function_exists('__')) {
                 // phpcs:ignore Generic.Files.LineLength.TooLong
-                $providerMetadataArgs[] = __('Text, image, and speech generation with Gemini and Imagen.', 'ai-provider-for-google');
+                $providerMetadataArgs[] = __('Text, image, speech and embedding generation with Gemini and Imagen.', 'ai-provider-for-google');
             } else {
-                $providerMetadataArgs[] = 'Text, image, and speech generation with Gemini and Imagen.';
+                $providerMetadataArgs[] = 'Text, image, speech and embedding generation with Gemini and Imagen.';
             }
         }
         // Provider logoPath support was added in 1.3.0.
