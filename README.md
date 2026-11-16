@@ -99,8 +99,15 @@ mapping every modality into the same vector space. That means a text embedding c
 directly against an image embedding, which is what makes cross-modal search possible.
 
 ```php
+use WordPress\AiClient\Files\DTO\File;
+
 // Embed an image. Remote URLs, such as WordPress attachment URLs, are passed through directly.
 $embedding = AiClient::input(new File(wp_get_attachment_url($attachment_id)))
+    ->usingModel(GoogleProvider::model('gemini-embedding-2'))
+    ->generateEmbedding();
+
+// Embed a local file instead. The file is read and sent inline as base64 data.
+$embedding = AiClient::input(new File(get_attached_file($attachment_id)))
     ->usingModel(GoogleProvider::model('gemini-embedding-2'))
     ->generateEmbedding();
 
@@ -113,6 +120,13 @@ $embeddings = AiClient::input([
     ->usingModel(GoogleProvider::model('gemini-embedding-2'))
     ->generateEmbeddings();
 ```
+
+Remote URLs are fetched by Google, not by your server, so they must be publicly reachable. URLs on
+a localhost, staging or password-protected site, or behind a login, will fail. In those cases, pass
+a local file path (such as the result of `get_attached_file()`) or a base64 data URI instead, so the
+file contents are sent inline with the request. Google limits remote URLs to 15 MB per file and
+inline data to 100 MB per request (50 MB for PDFs); see Google's
+[file input methods](https://ai.google.dev/gemini-api/docs/file-input-methods) documentation.
 
 Input modalities are advertised per model, so the model you name is matched against the inputs you
 provide. Passing an image to a text-only model such as `gemini-embedding-001` is rejected. On PHP AI
