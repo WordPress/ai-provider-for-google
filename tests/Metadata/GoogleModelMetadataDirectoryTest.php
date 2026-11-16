@@ -13,7 +13,7 @@ use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
 /**
  * Tests for the Google model metadata directory.
  *
- * @since n.e.x.t
+ * @since 1.3.0
  */
 class GoogleModelMetadataDirectoryTest extends TestCase
 {

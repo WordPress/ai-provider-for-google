@@ -10,14 +10,14 @@ use WordPress\AiClient\Files\DTO\File;
 /**
  * Trait for transforming files into Google API request parts.
  *
- * @since n.e.x.t
+ * @since 1.3.0
  */
 trait WithFilePartDataTrait
 {
     /**
      * Returns the Google API specific part data for a file.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param File $file The file to get the part data for.
      * @return array<string, mixed> The part data for the file.

@@ -420,7 +420,7 @@ class GoogleModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadata
      * mix any subset of the modalities a model accepts. Option matching compares the required
      * modality set for exact equality, so each subset has to be advertised individually.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param list<ModalityEnum> $modalities The input modalities the model accepts.
      * @return list<list<ModalityEnum>> All non-empty combinations of the given modalities.
