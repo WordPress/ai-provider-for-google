@@ -751,17 +751,6 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
      */
     protected function parseResponseCandidateToCandidate(array $candidateData, int $index): Candidate
     {
-        if (
-            !isset($candidateData['content']) ||
-            !is_array($candidateData['content']) ||
-            array_is_list($candidateData['content'])
-        ) {
-            throw ResponseException::fromMissingData(
-                $this->providerMetadata()->getName(),
-                "candidates[{$index}].content"
-            );
-        }
-
         if (!isset($candidateData['finishReason']) || !is_string($candidateData['finishReason'])) {
             throw ResponseException::fromMissingData(
                 $this->providerMetadata()->getName(),
@@ -769,7 +758,20 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             );
         }
 
-        $messageData = $candidateData['content'];
+        /*
+         * Google may omit the content or return it as an empty object when nothing was generated, e.g. when the
+         * token limit was used up by thinking or no image was produced. That results in a message without parts,
+         * and the finish reason tells the caller why. An empty JSON object decodes to an empty PHP array.
+         */
+        $messageData = $candidateData['content'] ?? [];
+        if (!is_array($messageData) || ($messageData && array_is_list($messageData))) {
+            throw ResponseException::fromInvalidData(
+                $this->providerMetadata()->getName(),
+                "candidates[{$index}].content",
+                'The value must be an object.'
+            );
+        }
+
         $message = $this->parseResponseCandidateMessage($messageData, $index);
 
         switch ($candidateData['finishReason']) {
@@ -787,22 +789,26 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
                 }
                 break;
             case 'MAX_TOKENS':
+            case 'CONTINUATION':
                 $finishReason = FinishReasonEnum::length();
                 break;
-            case 'IMAGE_SAFETY':
-            case 'RECITATION':
             case 'SAFETY':
+            case 'RECITATION':
             case 'BLOCKLIST':
             case 'PROHIBITED_CONTENT':
             case 'SPII':
+            case 'IMAGE_SAFETY':
+            case 'IMAGE_PROHIBITED_CONTENT':
+            case 'IMAGE_RECITATION':
+            case 'ESCALATION':
                 $finishReason = FinishReasonEnum::contentFilter();
                 break;
             default:
-                throw ResponseException::fromInvalidData(
-                    $this->providerMetadata()->getName(),
-                    "candidates[{$index}].finishReason",
-                    sprintf('Invalid finish reason "%s".', $candidateData['finishReason'])
-                );
+                /*
+                 * Anything else (e.g. "NO_IMAGE", "IMAGE_OTHER", "MALFORMED_FUNCTION_CALL", "OTHER") means generation
+                 * ended abnormally. Google keeps adding new values, so unknown ones are treated the same way.
+                 */
+                $finishReason = FinishReasonEnum::error();
         }
 
         return new Candidate($message, $finishReason);
@@ -824,10 +830,8 @@ class GoogleTextGenerationModel extends AbstractApiBasedModel implements TextGen
             : MessageRoleEnum::model();
 
         if (!isset($messageData['parts'])) {
-            throw ResponseException::fromMissingData(
-                $this->providerMetadata()->getName(),
-                "candidates[{$index}].content.parts"
-            );
+            // Google omits the parts when nothing was generated, e.g. when the token limit was reached while thinking.
+            return new Message($role, []);
         }
         if (!is_array($messageData['parts']) || !array_is_list($messageData['parts'])) {
             throw ResponseException::fromInvalidData(

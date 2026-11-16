@@ -822,4 +822,110 @@ class GoogleTextGenerationModelTest extends TestCase
             'trailing newline' => ["https://example.com/a.png\n"],
         ];
     }
+
+    /**
+     * Tests that a candidate without generated content is parsed into an empty message with its finish reason.
+     *
+     * @dataProvider candidateWithoutGeneratedContentProvider
+     *
+     * @since n.e.x.t
+     *
+     * @param array<string, mixed> $candidateData  The candidate data from the API response.
+     * @param string               $expectedReason The expected finish reason value.
+     */
+    public function testCandidateWithoutGeneratedContent(array $candidateData, string $expectedReason): void
+    {
+        $result = $this->parseResponse(['candidates' => [$candidateData]]);
+
+        $candidate = $result->getCandidates()[0];
+        $this->assertSame($expectedReason, $candidate->getFinishReason()->value);
+        $this->assertSame([], $candidate->getMessage()->getParts());
+        $this->assertTrue($candidate->getMessage()->getRole()->isModel());
+    }
+
+    /**
+     * Provides candidates without generated content, as returned by the Gemini API.
+     *
+     * @since n.e.x.t
+     *
+     * @return array<string, array{array<string, mixed>, string}>
+     */
+    public function candidateWithoutGeneratedContentProvider(): array
+    {
+        return [
+            'empty content object' => [
+                ['content' => new \stdClass(), 'finishReason' => 'MAX_TOKENS', 'index' => 0],
+                'length',
+            ],
+            'content without parts' => [
+                ['content' => ['role' => 'model'], 'finishReason' => 'MAX_TOKENS', 'index' => 0],
+                'length',
+            ],
+            'no content, no image' => [
+                ['finishReason' => 'NO_IMAGE', 'index' => 0],
+                'error',
+            ],
+            'no content, image other' => [
+                ['finishReason' => 'IMAGE_OTHER', 'finishMessage' => 'Unable to show the generated image.'],
+                'error',
+            ],
+            'no content, image safety' => [
+                ['finishReason' => 'IMAGE_SAFETY', 'index' => 0],
+                'content_filter',
+            ],
+            'no content, image prohibited content' => [
+                ['finishReason' => 'IMAGE_PROHIBITED_CONTENT', 'index' => 0],
+                'content_filter',
+            ],
+            'no content, continuation' => [
+                ['finishReason' => 'CONTINUATION', 'index' => 0],
+                'length',
+            ],
+            'no content, unknown finish reason' => [
+                ['finishReason' => 'SOME_FUTURE_REASON', 'index' => 0],
+                'error',
+            ],
+        ];
+    }
+
+    /**
+     * Tests that unknown finish reasons no longer discard generated content.
+     *
+     * @since n.e.x.t
+     */
+    public function testUnknownFinishReasonKeepsContent(): void
+    {
+        $result = $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => ['role' => 'model', 'parts' => [['text' => 'Partial answer']]],
+                    'finishReason' => 'MALFORMED_FUNCTION_CALL',
+                ],
+            ],
+        ]);
+
+        $candidate = $result->getCandidates()[0];
+        $this->assertSame('error', $candidate->getFinishReason()->value);
+        $this->assertSame('Partial answer', $candidate->getMessage()->getParts()[0]->getText());
+    }
+
+    /**
+     * Tests that candidate content which is not an object is still rejected.
+     *
+     * @since n.e.x.t
+     */
+    public function testCandidateRejectsNonObjectContent(): void
+    {
+        $this->expectException(ResponseException::class);
+        $this->expectExceptionMessage('candidates[0].content');
+
+        $this->parseResponse([
+            'candidates' => [
+                [
+                    'content' => [['text' => 'not an object']],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+        ]);
+    }
 }
