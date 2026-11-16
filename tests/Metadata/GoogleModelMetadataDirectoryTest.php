@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WordPress\GoogleAiProvider\Tests\unit\Metadata;
+namespace WordPress\GoogleAiProvider\Tests\Metadata;
 
 use PHPUnit\Framework\TestCase;
 use WordPress\AiClient\Providers\Http\DTO\Response;
@@ -11,7 +11,9 @@ use WordPress\AiClient\Providers\Models\EmbeddingGeneration\Contracts\EmbeddingG
 use WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory;
 
 /**
- * @covers \WordPress\GoogleAiProvider\Metadata\GoogleModelMetadataDirectory
+ * Tests for the Google model metadata directory.
+ *
+ * @since n.e.x.t
  */
 class GoogleModelMetadataDirectoryTest extends TestCase
 {

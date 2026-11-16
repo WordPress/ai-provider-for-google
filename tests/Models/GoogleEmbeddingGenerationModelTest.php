@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WordPress\GoogleAiProvider\Tests\unit\Models;
+namespace WordPress\GoogleAiProvider\Tests\Models;
 
 use PHPUnit\Framework\TestCase;
 use WordPress\AiClient\Common\Exception\InvalidArgumentException;
@@ -23,7 +23,9 @@ use WordPress\AiClient\Tools\DTO\FunctionCall;
 use WordPress\GoogleAiProvider\Models\GoogleEmbeddingGenerationModel;
 
 /**
- * @covers \WordPress\GoogleAiProvider\Models\GoogleEmbeddingGenerationModel
+ * Tests for the Google embedding generation model.
+ *
+ * @since n.e.x.t
  */
 class GoogleEmbeddingGenerationModelTest extends TestCase
 {
