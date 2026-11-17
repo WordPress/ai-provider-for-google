@@ -827,7 +827,7 @@ class GoogleTextGenerationModelTest extends TestCase
     /**
      * Tests that file parts keep their thought signature when sent back to the API.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      */
     public function testFilePartThoughtSignatureIsSentBack(): void
     {

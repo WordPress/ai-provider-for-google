@@ -25,7 +25,7 @@ use WordPress\GoogleAiProvider\Models\GoogleEmbeddingGenerationModel;
 /**
  * Tests for the Google embedding generation model.
  *
- * @since n.e.x.t
+ * @since 1.3.0
  */
 class GoogleEmbeddingGenerationModelTest extends TestCase
 {

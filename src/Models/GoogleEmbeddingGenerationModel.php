@@ -25,7 +25,7 @@ use WordPress\GoogleAiProvider\Provider\GoogleProvider;
 /**
  * Class for a Google embedding generation model using the batchEmbedContents endpoint.
  *
- * @since n.e.x.t
+ * @since 1.3.0
  *
  * @phpstan-type EmbeddingData array{values?: list<float|int>}
  * @phpstan-type UsageMetadata array{promptTokenCount?: int}
@@ -38,7 +38,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * The maximum number of inputs the batchEmbedContents endpoint accepts per request.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      * @var int
      */
     protected const MAX_BATCH_SIZE = 100;
@@ -46,7 +46,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      */
     public function getRequestAuthentication(): RequestAuthenticationInterface
     {
@@ -64,7 +64,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * {@inheritDoc}
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
      * @return EmbeddingResult The embedding result.
@@ -108,7 +108,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * Prepares the given inputs and the model configuration into parameters for the API request.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param list<MessagePart> $input The inputs to generate embeddings for, one embedding per input.
      * @return array<string, mixed> The parameters for the API request.
@@ -167,7 +167,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
      * modality is determined by the model's declared input modalities, not here. Conversation
      * specific data such as thought markers and thought signatures is not sent.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param mixed $part  The message part that makes up one embedding input.
      * @param int   $index The index of the part within the input list, used for error messages.
@@ -212,7 +212,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * Parses the response from the API endpoint to an embedding result.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param Response $response      The response from the API endpoint.
      * @param int      $expectedCount The number of inputs, i.e. the number of embeddings expected.
@@ -290,7 +290,7 @@ class GoogleEmbeddingGenerationModel extends AbstractApiBasedModel implements Em
     /**
      * Combines the results of multiple batch requests into a single embedding result.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      *
      * @param non-empty-list<EmbeddingResult> $results The results, in input order.
      * @return EmbeddingResult The combined embedding result.

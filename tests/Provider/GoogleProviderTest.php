@@ -46,7 +46,7 @@ class GoogleProviderTest extends TestCase
     /**
      * Tests that an embedding-capable model is created as an embedding generation model.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      */
     public function testCreatesEmbeddingModelForEmbeddingCapability(): void
     {
@@ -62,7 +62,7 @@ class GoogleProviderTest extends TestCase
     /**
      * Tests that embedding models are rejected when the PHP AI Client lacks embedding support.
      *
-     * @since n.e.x.t
+     * @since 1.3.0
      */
     public function testRejectsEmbeddingCapabilityWithoutClientSupport(): void
     {
